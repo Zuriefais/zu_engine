@@ -1,6 +1,7 @@
 use crate::egui_tools::EguiRenderer;
 use crate::gui::EngineGui;
 
+use crate::object_render_pass::{self, ObjectRenderPass};
 use crate::styles::{default_dark::default_dark_theme, gruvbox_egui::gruvbox_dark_theme};
 use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
@@ -22,6 +23,7 @@ pub struct AppState {
     pub egui_renderer: EguiRenderer,
     pub engine_gui: EngineGui,
     pub window: Arc<Window>,
+    pub object_render_pass: ObjectRenderPass,
 }
 
 impl AppState {
@@ -110,6 +112,8 @@ impl AppState {
 
         let engine_gui = EngineGui::new(egui_renderer.context());
 
+        let object_render_pass = ObjectRenderPass::new(&device, &surface_config);
+
         info!("App State created!!");
 
         Ok(Self {
@@ -121,6 +125,7 @@ impl AppState {
             scale_factor,
             engine_gui,
             window,
+            object_render_pass,
         })
     }
 
@@ -160,6 +165,8 @@ impl AppState {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
+        self.object_render_pass.render(&mut encoder, &surface_view);
 
         self.egui_renderer.begin_frame(window);
         self.engine_gui.render_gui();
