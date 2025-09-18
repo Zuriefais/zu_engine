@@ -1,0 +1,26 @@
+[package]
+name = "zu_core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+wgpu = "25.0.2"
+
+#Egui stuff
+egui = { workspace = true }
+egui_extras = { version = "0.32.3", features = ["syntect"] }
+egui-wgpu = { version = "0.32.3", features = ["winit"] }
+egui-winit = { version = "0.32.3", default-features = false }
+
+winit = "0.30.12"
+log = { workspace = true }
+anyhow = "1.0.98"
+parking_lot = {workspace = true}
+env_logger = "0.11.8"
+pollster = "0.4.0"
+
+
+[profile.dev]
+opt-level = 0
+[profile.dev.package."*"]
+opt-level = 3

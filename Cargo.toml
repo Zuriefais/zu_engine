@@ -1,0 +1,13 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.dependencies]
+log = "0.4.27"
+indexmap = "2.10.0"
+wasm_thread = "*"
+parking_lot = "0.12.4"
+
+zu_core = {path = "crates/zu_core"}
+
+egui = { version = "0.32.3" }
