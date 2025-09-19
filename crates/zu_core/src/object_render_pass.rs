@@ -89,6 +89,7 @@ impl Instance {
 pub struct ObjectRenderPass {
     render_pipeline: wgpu::RenderPipeline,
     camera_bind_group: BindGroup,
+    camera_buffer: Buffer,
     vertex_buffer: Buffer,
     index_buffer: Buffer,
     index_count: u32,
@@ -101,7 +102,7 @@ impl ObjectRenderPass {
         let camera_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: Some(&"Camera"),
             contents: bytemuck::bytes_of(&camera.get_camera_uninform()),
-            usage: BufferUsages::UNIFORM,
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
 
         let camera_bind_group_layout =
@@ -196,14 +197,22 @@ impl ObjectRenderPass {
             index_buffer,
             index_count,
             vertex_buffer,
+            camera_buffer,
         }
     }
 
-    pub fn render(&mut self, encoder: &mut CommandEncoder, device: &Device, view: &TextureView) {
+    pub fn render(
+        &mut self,
+        encoder: &mut CommandEncoder,
+        device: &Device,
+        queue: &Queue,
+        view: &TextureView,
+        camera: &Camera,
+    ) {
         let instances = vec![Instance {
             position: Vec2::ZERO,
             scale: Vec2::new(1.0, 1.0),
-            color: Vec4::new(1.0, 1.0, 1.0, 1.0),
+            color: Vec4::new(1.0, 1.0, 0.0, 1.0),
         }];
 
         // Per frame: upload instance buffer
@@ -212,6 +221,12 @@ impl ObjectRenderPass {
             contents: bytemuck::cast_slice(&instances), // Vec<Instance>
             usage: wgpu::BufferUsages::VERTEX,
         });
+
+        queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            bytemuck::bytes_of(&camera.get_camera_uninform()),
+        );
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),

@@ -139,6 +139,8 @@ impl AppState {
         self.surface_config.width = width;
         self.surface_config.height = height;
         self.surface.configure(&self.device, &self.surface_config);
+        self.camera
+            .update_from_screen_size(width as f32, height as f32);
     }
 
     pub fn handle_redraw(&mut self) {
@@ -172,8 +174,13 @@ impl AppState {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-        self.object_render_pass
-            .render(&mut encoder, &self.device, &surface_view);
+        self.object_render_pass.render(
+            &mut encoder,
+            &self.device,
+            &self.queue,
+            &surface_view,
+            &self.camera,
+        );
 
         self.egui_renderer.begin_frame(window);
         self.engine_gui.render_gui();
