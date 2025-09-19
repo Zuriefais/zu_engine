@@ -1,17 +1,137 @@
-use wgpu::{CommandEncoder, Device, Queue, TextureView};
+use bytemuck::{Pod, Zeroable};
+use glam::{Vec2, Vec4};
+use wgpu::{
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
+    BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferDescriptor, BufferUsages,
+    CommandEncoder, Device, Queue, ShaderStages, TextureView, VertexBufferLayout,
+    util::{BufferInitDescriptor, DeviceExt},
+};
+
+use crate::camera::{Camera, CameraUniform};
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct QuadVertex {
+    position: Vec2,
+}
+
+impl QuadVertex {
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        use std::mem;
+        wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<QuadVertex>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex, // per-vertex
+            attributes: &[wgpu::VertexAttribute {
+                offset: 0,
+                shader_location: 0, // matches @location(0)
+                format: wgpu::VertexFormat::Float32x2,
+            }],
+        }
+    }
+}
+
+// a unit quad (two triangles)
+const QUAD_VERTICES: &[QuadVertex] = &[
+    QuadVertex {
+        position: Vec2::new(-0.5, -0.5),
+    },
+    QuadVertex {
+        position: Vec2::new(0.5, -0.5),
+    },
+    QuadVertex {
+        position: Vec2::new(0.5, 0.5),
+    },
+    QuadVertex {
+        position: Vec2::new(-0.5, 0.5),
+    },
+];
+
+const QUAD_INDICES: &[u16] = &[0, 1, 2, 0, 2, 3];
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct Instance {
+    position: Vec2,
+    scale: Vec2,
+    color: Vec4,
+}
+
+impl Instance {
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        use std::mem;
+        wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<Instance>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance, // per-instance
+            attributes: &[
+                // @location(1) position
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                // @location(2) scale
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<Vec2>() as wgpu::BufferAddress,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                // @location(3) color
+                wgpu::VertexAttribute {
+                    offset: (mem::size_of::<Vec4>()) as wgpu::BufferAddress,
+                    shader_location: 3,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+            ],
+        }
+    }
+}
 
 pub struct ObjectRenderPass {
     render_pipeline: wgpu::RenderPipeline,
+    camera_bind_group: BindGroup,
+    vertex_buffer: Buffer,
+    index_buffer: Buffer,
+    index_count: u32,
 }
 
 impl ObjectRenderPass {
-    pub fn new(device: &Device, config: &wgpu::SurfaceConfiguration) -> Self {
-        let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+    pub fn new(device: &Device, config: &wgpu::SurfaceConfiguration, camera: &Camera) -> Self {
+        let shader = device.create_shader_module(wgpu::include_wgsl!("../shaders/obj_draw.wgsl"));
+
+        let camera_buffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: Some(&"Camera"),
+            contents: bytemuck::bytes_of(&camera.get_camera_uninform()),
+            usage: BufferUsages::UNIFORM,
+        });
+
+        let camera_bind_group_layout =
+            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: Some("Camera"),
+                entries: &[BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let camera_bind_group = device.create_bind_group(&BindGroupDescriptor {
+            label: Some("Camera"),
+            layout: &camera_bind_group_layout,
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: camera_buffer.as_entire_binding(),
+            }],
+        });
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[],
+                bind_group_layouts: &[&camera_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -20,8 +140,8 @@ impl ObjectRenderPass {
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
-                entry_point: Some("vs_main"), // 1.
-                buffers: &[],                 // 2.
+                entry_point: Some("vs_main"),                     // 1.
+                buffers: &[QuadVertex::desc(), Instance::desc()], // 2.
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -57,10 +177,42 @@ impl ObjectRenderPass {
             multiview: None, // 5.
             cache: None,     // 6.
         });
-        ObjectRenderPass { render_pipeline }
+
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Quad Vertex Buffer"),
+            contents: bytemuck::cast_slice(QUAD_VERTICES),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Quad Index Buffer"),
+            contents: bytemuck::cast_slice(QUAD_INDICES),
+            usage: wgpu::BufferUsages::INDEX,
+        });
+        let index_count = QUAD_INDICES.len() as u32;
+
+        ObjectRenderPass {
+            render_pipeline,
+            camera_bind_group,
+            index_buffer,
+            index_count,
+            vertex_buffer,
+        }
     }
 
-    pub fn render(&mut self, encoder: &mut CommandEncoder, view: &TextureView) {
+    pub fn render(&mut self, encoder: &mut CommandEncoder, device: &Device, view: &TextureView) {
+        let instances = vec![Instance {
+            position: Vec2::ZERO,
+            scale: Vec2::new(1.0, 1.0),
+            color: Vec4::new(1.0, 1.0, 1.0, 1.0),
+        }];
+
+        // Per frame: upload instance buffer
+        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Instance Buffer"),
+            contents: bytemuck::cast_slice(&instances), // Vec<Instance>
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
             color_attachments: &[
@@ -84,8 +236,11 @@ impl ObjectRenderPass {
             occlusion_query_set: Default::default(),
         });
 
-        // NEW!
         render_pass.set_pipeline(&self.render_pipeline); // 2.
-        render_pass.draw(0..3, 0..1); // 3.}
+        render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
+        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.draw_indexed(0..self.index_count, 0, 0..instances.len() as u32);
     }
 }

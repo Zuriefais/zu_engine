@@ -1,9 +1,9 @@
 mod app;
 mod app_state;
+pub mod camera;
 mod egui_tools;
 mod gui;
 mod object_render_pass;
-
 mod styles;
 mod widgets;
 

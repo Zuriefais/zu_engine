@@ -1,3 +1,4 @@
+use crate::camera::Camera;
 use crate::egui_tools::EguiRenderer;
 use crate::gui::EngineGui;
 
@@ -5,6 +6,7 @@ use crate::object_render_pass::{self, ObjectRenderPass};
 use crate::styles::{default_dark::default_dark_theme, gruvbox_egui::gruvbox_dark_theme};
 use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
+use glam::Vec2;
 use log::info;
 use std::sync::{Arc, Mutex};
 
@@ -24,6 +26,7 @@ pub struct AppState {
     pub engine_gui: EngineGui,
     pub window: Arc<Window>,
     pub object_render_pass: ObjectRenderPass,
+    pub camera: Camera,
 }
 
 impl AppState {
@@ -111,8 +114,10 @@ impl AppState {
         let scale_factor = 1.0;
 
         let engine_gui = EngineGui::new(egui_renderer.context());
+        let camera =
+            Camera::from_screen_size(width as f32, height as f32, 0.1, 1000.0, 1.0, Vec2::ZERO);
 
-        let object_render_pass = ObjectRenderPass::new(&device, &surface_config);
+        let object_render_pass = ObjectRenderPass::new(&device, &surface_config, &camera);
 
         info!("App State created!!");
 
@@ -126,6 +131,7 @@ impl AppState {
             engine_gui,
             window,
             object_render_pass,
+            camera,
         })
     }
 
@@ -166,7 +172,8 @@ impl AppState {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-        self.object_render_pass.render(&mut encoder, &surface_view);
+        self.object_render_pass
+            .render(&mut encoder, &self.device, &surface_view);
 
         self.egui_renderer.begin_frame(window);
         self.engine_gui.render_gui();
