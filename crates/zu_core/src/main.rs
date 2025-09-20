@@ -2,6 +2,7 @@ mod app;
 mod app_state;
 pub mod camera;
 mod egui_tools;
+mod fragment_render_pass;
 mod gui;
 mod object_render_pass;
 mod styles;

@@ -1,8 +1,8 @@
 use crate::camera::Camera;
 use crate::egui_tools::EguiRenderer;
+use crate::fragment_render_pass::FragmentRenderPass;
 use crate::gui::EngineGui;
 
-use crate::object_render_pass::{self, ObjectRenderPass};
 use crate::styles::{default_dark::default_dark_theme, gruvbox_egui::gruvbox_dark_theme};
 use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
@@ -25,8 +25,12 @@ pub struct AppState {
     pub egui_renderer: EguiRenderer,
     pub engine_gui: EngineGui,
     pub window: Arc<Window>,
-    pub object_render_pass: ObjectRenderPass,
+    pub fragment_render_pass: FragmentRenderPass,
     pub camera: Camera,
+    color: [f32; 4],
+    paint: bool,
+    mouse_pos: Vec2,
+    brush_radius: u32,
 }
 
 impl AppState {
@@ -117,7 +121,7 @@ impl AppState {
         let camera =
             Camera::from_screen_size(width as f32, height as f32, 0.1, 1000.0, 1.0, Vec2::ZERO);
 
-        let object_render_pass = ObjectRenderPass::new(&device, &surface_config, &camera);
+        let fragment_render_pass = FragmentRenderPass::new(&device, &surface_config, width, height);
 
         info!("App State created!!");
 
@@ -130,8 +134,12 @@ impl AppState {
             scale_factor,
             engine_gui,
             window,
-            object_render_pass,
+            fragment_render_pass,
             camera,
+            paint: false,
+            color: [1.0, 1.0, 1.0, 1.0],
+            mouse_pos: Vec2::ZERO,
+            brush_radius: 10,
         })
     }
 
@@ -141,12 +149,25 @@ impl AppState {
         self.surface.configure(&self.device, &self.surface_config);
         self.camera
             .update_from_screen_size(width as f32, height as f32);
+        self.fragment_render_pass
+            .resize(width, height, &self.device, &self.queue);
     }
 
     pub fn handle_redraw(&mut self) {
         let window = &self.window;
         let width = self.surface_config.width;
         let height = self.surface_config.height;
+
+        if self.paint {
+            self.fragment_render_pass.paint(
+                self.mouse_pos,
+                self.color,
+                self.brush_radius,
+                width,
+                height,
+                &self.queue,
+            );
+        }
 
         let screen_descriptor = ScreenDescriptor {
             size_in_pixels: [width, height],
@@ -174,16 +195,16 @@ impl AppState {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-        self.object_render_pass.render(
-            &mut encoder,
-            &self.device,
-            &self.queue,
-            &surface_view,
-            &self.camera,
-        );
+        self.fragment_render_pass
+            .render(&mut encoder, &self.device, &self.queue, &surface_view);
 
         self.egui_renderer.begin_frame(window);
-        self.engine_gui.render_gui();
+        self.engine_gui.render_gui(
+            &mut self.color,
+            &mut self.paint,
+            &mut self.mouse_pos,
+            &mut self.brush_radius,
+        );
         self.egui_renderer.end_frame_and_draw(
             &self.device,
             &self.queue,

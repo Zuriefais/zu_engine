@@ -209,11 +209,18 @@ impl ObjectRenderPass {
         view: &TextureView,
         camera: &Camera,
     ) {
-        let instances = vec![Instance {
-            position: Vec2::ZERO,
-            scale: Vec2::new(1.0, 1.0),
-            color: Vec4::new(1.0, 1.0, 0.0, 1.0),
-        }];
+        let instances = vec![
+            Instance {
+                position: Vec2::ZERO,
+                scale: Vec2::new(1.0, 1.0),
+                color: Vec4::new(1.0, 1.0, 0.0, 1.0),
+            },
+            Instance {
+                position: Vec2::new(0.0, 1.0),
+                scale: Vec2::new(1.0, 1.0),
+                color: Vec4::new(1.0, 0.0, 1.0, 1.0),
+            },
+        ];
 
         // Per frame: upload instance buffer
         let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
