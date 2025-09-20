@@ -6,6 +6,7 @@
 @group(0) @binding(3) var<uniform> size: vec2<f32>;
 @group(0) @binding(4) var<uniform> accum_radiance: i32;
 @group(0) @binding(5) var<uniform> max_steps: i32;
+@group(0) @binding(6) var<uniform> enable_noise: i32;
 
 // Vertex input
 struct VertexInput {
@@ -47,6 +48,8 @@ fn outOfBounds(uv: vec2<f32>) -> bool {
     return uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0;
 }
 
+fn rand22(n: vec2f) -> f32 { return fract(sin(dot(n, vec2f(12.9898, 4.1414))) * 43758.5453); }
+
 fn raymarch(light: vec4<f32>, uv: vec2<f32>) -> vec4<f32> {
     if light.a > 0.1 {
         return light;
@@ -55,7 +58,7 @@ fn raymarch(light: vec4<f32>, uv: vec2<f32>) -> vec4<f32> {
     var tau_over_ray_count: f32 = TAU * one_over_ray_count;
 
     // Distinct random value for every pixel
-    var noise: f32 = 0.1;
+    var noise: f32 = select(0.1, rand22(uv), bool(enable_noise));
     var radiance = vec4(0.0);
 
     for (var i = 0; i < ray_count; i++) {

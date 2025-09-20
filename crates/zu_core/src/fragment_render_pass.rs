@@ -69,7 +69,11 @@ fn create_texture(width: u32, height: u32, device: &Device) -> (Texture, Texture
     (texture, texture_view)
 }
 
-fn create_buffers(device: &Device, width: u32, height: u32) -> (Buffer, Buffer, Buffer, Buffer) {
+fn create_buffers(
+    device: &Device,
+    width: u32,
+    height: u32,
+) -> (Buffer, Buffer, Buffer, Buffer, Buffer) {
     let ray_count_buffer = device.create_buffer_init(&BufferInitDescriptor {
         label: Some(&"Ray Count Buffer"),
         contents: bytemuck::bytes_of(&8i32), // Use i32 to match WGSL
@@ -90,11 +94,17 @@ fn create_buffers(device: &Device, width: u32, height: u32) -> (Buffer, Buffer, 
         contents: bytemuck::bytes_of(&128i32), // Use i32 to match WGSL
         usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
     });
+    let enable_noise_buffer = device.create_buffer_init(&BufferInitDescriptor {
+        label: Some(&"Enable noise Buffer"),
+        contents: bytemuck::bytes_of(&1i32), // Use i32 to match WGSL
+        usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+    });
     (
         ray_count_buffer,
         size_buffer,
         accum_radiance_buffer,
         max_steps_buffer,
+        enable_noise_buffer,
     )
 }
 
@@ -110,6 +120,7 @@ pub struct FragmentRenderPass {
     ray_count_buffer: Buffer,
     size_buffer: Buffer,
     accum_radiance_buffer: Buffer,
+    enable_noise_buffer: Buffer,
     max_steps_buffer: Buffer,
     sampler: wgpu::Sampler,
     bind_group_layout: wgpu::BindGroupLayout,
@@ -126,8 +137,13 @@ impl FragmentRenderPass {
             device.create_shader_module(wgpu::include_wgsl!("../shaders/radiance_cascades.wgsl"));
 
         let (texture, texture_view) = create_texture(width, height, device);
-        let (ray_count_buffer, size_buffer, accum_radiance_buffer, max_steps_buffer) =
-            create_buffers(device, width, height);
+        let (
+            ray_count_buffer,
+            size_buffer,
+            accum_radiance_buffer,
+            max_steps_buffer,
+            enable_noise_buffer,
+        ) = create_buffers(device, width, height);
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -204,6 +220,17 @@ impl FragmentRenderPass {
                         },
                         count: None,
                     },
+                    // enable noise
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 6,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
                 ],
             });
 
@@ -234,6 +261,10 @@ impl FragmentRenderPass {
                 wgpu::BindGroupEntry {
                     binding: 5,
                     resource: max_steps_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: enable_noise_buffer.as_entire_binding(),
                 },
             ],
         });
@@ -315,6 +346,7 @@ impl FragmentRenderPass {
             max_steps_buffer,
             sampler,
             bind_group_layout: texture_bind_group_layout,
+            enable_noise_buffer,
         }
     }
 
@@ -400,6 +432,10 @@ impl FragmentRenderPass {
                     binding: 5,
                     resource: self.max_steps_buffer.as_entire_binding(),
                 },
+                BindGroupEntry {
+                    binding: 6,
+                    resource: self.enable_noise_buffer.as_entire_binding(),
+                },
             ],
         });
         info!("Texture resized");
@@ -414,6 +450,7 @@ impl FragmentRenderPass {
         ray_count: u32,
         accum_radiance: bool,
         max_steps: u32,
+        enable_noise: bool,
     ) {
         queue.write_buffer(
             &self.ray_count_buffer,
@@ -424,6 +461,11 @@ impl FragmentRenderPass {
             &self.accum_radiance_buffer,
             0,
             bytemuck::bytes_of(&(accum_radiance as i32)), // Convert bool to i32 for WGSL
+        );
+        queue.write_buffer(
+            &self.enable_noise_buffer,
+            0,
+            bytemuck::bytes_of(&(enable_noise as i32)), // Convert bool to i32 for WGSL
         );
         queue.write_buffer(
             &self.max_steps_buffer,

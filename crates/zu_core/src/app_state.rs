@@ -34,6 +34,7 @@ pub struct AppState {
     ray_count: u32,
     accum_radiance: bool,
     max_steps: u32,
+    enable_noise: bool,
 }
 
 impl AppState {
@@ -146,6 +147,7 @@ impl AppState {
             ray_count: 8,
             accum_radiance: true,
             max_steps: 128,
+            enable_noise: true,
         })
     }
 
@@ -209,6 +211,7 @@ impl AppState {
             self.ray_count,
             self.accum_radiance,
             self.max_steps,
+            self.enable_noise,
         );
 
         self.egui_renderer.begin_frame(window);
@@ -220,6 +223,7 @@ impl AppState {
             &mut self.ray_count,
             &mut self.accum_radiance,
             &mut self.max_steps,
+            &mut self.enable_noise,
         );
         self.egui_renderer.end_frame_and_draw(
             &self.device,
