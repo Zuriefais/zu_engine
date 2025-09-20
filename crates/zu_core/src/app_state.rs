@@ -31,6 +31,9 @@ pub struct AppState {
     paint: bool,
     mouse_pos: Vec2,
     brush_radius: u32,
+    ray_count: u32,
+    accum_radiance: bool,
+    max_steps: u32,
 }
 
 impl AppState {
@@ -140,6 +143,9 @@ impl AppState {
             color: [1.0, 1.0, 1.0, 1.0],
             mouse_pos: Vec2::ZERO,
             brush_radius: 10,
+            ray_count: 8,
+            accum_radiance: true,
+            max_steps: 128,
         })
     }
 
@@ -195,8 +201,15 @@ impl AppState {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-        self.fragment_render_pass
-            .render(&mut encoder, &self.device, &self.queue, &surface_view);
+        self.fragment_render_pass.render(
+            &mut encoder,
+            &self.device,
+            &self.queue,
+            &surface_view,
+            self.ray_count,
+            self.accum_radiance,
+            self.max_steps,
+        );
 
         self.egui_renderer.begin_frame(window);
         self.engine_gui.render_gui(
@@ -204,6 +217,9 @@ impl AppState {
             &mut self.paint,
             &mut self.mouse_pos,
             &mut self.brush_radius,
+            &mut self.ray_count,
+            &mut self.accum_radiance,
+            &mut self.max_steps,
         );
         self.egui_renderer.end_frame_and_draw(
             &self.device,
