@@ -7,6 +7,7 @@ use crate::{
         jfa_pass::{self, JfaRenderPass},
         quad_vertex::QuadVertexRenderPass,
         radiance_render_pass::{RadianceRenderPass, RadiansOptions},
+        seed_pass::{self, SeedRenderPass},
     },
     scene_texture::SceneTexture,
 };
@@ -50,6 +51,7 @@ impl Default for RenderOptions {
 
 pub struct RenderPassManager {
     jfa_pass: JfaRenderPass,
+    seed_pass: SeedRenderPass,
     radiance_pass: RadianceRenderPass,
     quad_render_pass: QuadVertexRenderPass,
     render_options: RenderOptions,
@@ -67,7 +69,7 @@ impl RenderPassManager {
     ) -> RenderPassManager {
         let quad_render_pass = QuadVertexRenderPass::new(device);
         let jfa_pass = JfaRenderPass::new(device, config, width, height, &quad_render_pass);
-
+        let seed_pass = SeedRenderPass::new(device, config, width, height, &quad_render_pass);
         let scene_texture = SceneTexture::new(width, height, device);
         let radiance_pass = RadianceRenderPass::new(
             device,
@@ -89,6 +91,7 @@ impl RenderPassManager {
             scene_texture,
             texture1,
             texture2,
+            seed_pass,
         }
     }
 
@@ -111,19 +114,14 @@ impl RenderPassManager {
         queue: &Queue,
     ) {
         let passes = self.render_options.jfa_passes_count;
-        self.jfa_pass.set_skip(queue, true);
-        self.jfa_pass.render(
+        self.seed_pass.render(
             encoder,
             device,
-            queue,
             self.scene_texture.view(),
             &self.texture1,
-            2.0f32.powi((passes - 1) as i32),
             &self.quad_render_pass,
         );
-        let mut i = 1;
-        self.jfa_pass.set_skip(queue, false);
-        while i < passes || (passes == 0 && i == 0) {
+        for i in 0..passes {
             let texture1 = if i % 2 == 0 {
                 &self.texture1
             } else {
@@ -143,7 +141,6 @@ impl RenderPassManager {
                 2.0f32.powi((passes - i - 1) as i32),
                 &self.quad_render_pass,
             );
-            i += 1;
         }
 
         self.radiance_pass.render(
