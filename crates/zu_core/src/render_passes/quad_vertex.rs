@@ -1,6 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use glam::Vec2;
-use wgpu::{Buffer, Device, RenderPass, ShaderModule, VertexState, util::DeviceExt};
+use wgpu::{Buffer, Device, RenderPass, ShaderModule, util::DeviceExt};
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]

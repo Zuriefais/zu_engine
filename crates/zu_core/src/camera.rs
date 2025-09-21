@@ -126,8 +126,8 @@ impl Camera {
 
     pub fn event(&mut self, scroll: f32) {
         let new_zoom = match scroll.partial_cmp(&0.0) {
-            Some(std::cmp::Ordering::Greater) => (self.zoom_factor - 0.1),
-            Some(std::cmp::Ordering::Less) => (self.zoom_factor + 0.1),
+            Some(std::cmp::Ordering::Greater) => self.zoom_factor - 0.1,
+            Some(std::cmp::Ordering::Less) => self.zoom_factor + 0.1,
             _ => self.zoom_factor,
         };
         self.set_zoom(new_zoom);

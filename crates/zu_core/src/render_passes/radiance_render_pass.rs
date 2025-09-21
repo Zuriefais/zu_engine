@@ -1,19 +1,14 @@
-use bytemuck::{Pod, Zeroable};
 use egui_probe::EguiProbe;
-use glam::{Vec2, Vec4};
+use glam::Vec2;
 use log::info;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferDescriptor, BufferUsages,
-    CommandEncoder, Device, Queue, ShaderModuleDescriptor, ShaderStages, Texture, TextureView,
-    VertexBufferLayout,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindingResource, Buffer, BufferUsages,
+    CommandEncoder, Device, Queue, TextureView,
     util::{BufferInitDescriptor, DeviceExt},
 };
 
 use crate::{
-    camera::{Camera, CameraUniform},
-    render_passes::quad_vertex::QuadVertexRenderPass,
-    scene_texture::SceneTexture,
+    render_passes::quad_vertex::QuadVertexRenderPass, scene_texture::SceneTexture,
     vertex_state_for_quad,
 };
 
@@ -23,27 +18,27 @@ fn create_buffers(
     height: u32,
 ) -> (Buffer, Buffer, Buffer, Buffer, Buffer) {
     let ray_count_buffer = device.create_buffer_init(&BufferInitDescriptor {
-        label: Some(&"Ray Count Buffer"),
+        label: Some("Ray Count Buffer"),
         contents: bytemuck::bytes_of(&8i32), // Use i32 to match WGSL
         usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
     });
     let size_buffer = device.create_buffer_init(&BufferInitDescriptor {
-        label: Some(&"Size Buffer"),
+        label: Some("Size Buffer"),
         contents: bytemuck::bytes_of(&Vec2::new(width as f32, height as f32)),
         usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
     });
     let accum_radiance_buffer = device.create_buffer_init(&BufferInitDescriptor {
-        label: Some(&"Accum Radiance Buffer"),
+        label: Some("Accum Radiance Buffer"),
         contents: bytemuck::bytes_of(&1i32), // Use i32 to match WGSL
         usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
     });
     let max_steps_buffer = device.create_buffer_init(&BufferInitDescriptor {
-        label: Some(&"Max Steps Buffer"),
+        label: Some("Max Steps Buffer"),
         contents: bytemuck::bytes_of(&128i32), // Use i32 to match WGSL
         usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
     });
     let enable_noise_buffer = device.create_buffer_init(&BufferInitDescriptor {
-        label: Some(&"Enable noise Buffer"),
+        label: Some("Enable noise Buffer"),
         contents: bytemuck::bytes_of(&1i32), // Use i32 to match WGSL
         usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
     });
@@ -354,7 +349,7 @@ impl RadianceRenderPass {
         );
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
+            label: Some("Radiance render pass"),
             color_attachments: &[
                 // This is what @location(0) in the fragment shader targets
                 Some(wgpu::RenderPassColorAttachment {

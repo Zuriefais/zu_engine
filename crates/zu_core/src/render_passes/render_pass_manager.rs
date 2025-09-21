@@ -1,25 +1,61 @@
 use egui_probe::EguiProbe;
 use glam::Vec2;
-use wgpu::{CommandEncoder, Device, Queue, TextureView};
+use wgpu::{CommandEncoder, Device, Queue, Texture, TextureView};
 
 use crate::{
     render_passes::{
+        jfa_pass::{self, JfaRenderPass},
         quad_vertex::QuadVertexRenderPass,
         radiance_render_pass::{RadianceRenderPass, RadiansOptions},
     },
-    scene_texture::{self, SceneTexture},
+    scene_texture::SceneTexture,
 };
 
-#[derive(Debug, Default, Copy, Clone, EguiProbe)]
+fn create_texture(device: &Device, width: u32, height: u32) -> TextureView {
+    let texture_size = wgpu::Extent3d {
+        width,
+        height,
+        depth_or_array_layers: 1,
+    };
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        size: texture_size,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8UnormSrgb,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_DST
+            | wgpu::TextureUsages::RENDER_ATTACHMENT,
+        label: Some("diffuse_texture"),
+        view_formats: &[],
+    });
+    let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    texture_view
+}
+
+#[derive(Debug, Copy, Clone, EguiProbe)]
 pub struct RenderOptions {
     radians_options: RadiansOptions,
+    jfa_passes_count: u32,
+}
+
+impl Default for RenderOptions {
+    fn default() -> Self {
+        Self {
+            radians_options: Default::default(),
+            jfa_passes_count: 9,
+        }
+    }
 }
 
 pub struct RenderPassManager {
+    jfa_pass: JfaRenderPass,
     radiance_pass: RadianceRenderPass,
     quad_render_pass: QuadVertexRenderPass,
     render_options: RenderOptions,
     scene_texture: SceneTexture,
+    texture1: TextureView,
+    texture2: TextureView,
 }
 
 impl RenderPassManager {
@@ -30,6 +66,8 @@ impl RenderPassManager {
         height: u32,
     ) -> RenderPassManager {
         let quad_render_pass = QuadVertexRenderPass::new(device);
+        let jfa_pass = JfaRenderPass::new(device, config, width, height, &quad_render_pass);
+
         let scene_texture = SceneTexture::new(width, height, device);
         let radiance_pass = RadianceRenderPass::new(
             device,
@@ -39,18 +77,30 @@ impl RenderPassManager {
             &quad_render_pass,
             &scene_texture,
         );
+        let (texture1, texture2) = (
+            create_texture(device, width, height),
+            create_texture(device, width, height),
+        );
         Self {
+            jfa_pass,
             radiance_pass,
             quad_render_pass,
             render_options: Default::default(),
             scene_texture,
+            texture1,
+            texture2,
         }
     }
 
     pub fn resize(&mut self, width: u32, height: u32, device: &Device, queue: &Queue) {
         self.scene_texture.resize(width, height, device);
+        self.jfa_pass.resize(width, height, queue);
         self.radiance_pass
             .resize(width, height, device, queue, &self.scene_texture);
+        (self.texture1, self.texture2) = (
+            create_texture(device, width, height),
+            create_texture(device, width, height),
+        );
     }
 
     pub fn render(
@@ -60,6 +110,42 @@ impl RenderPassManager {
         device: &Device,
         queue: &Queue,
     ) {
+        let passes = self.render_options.jfa_passes_count;
+        self.jfa_pass.set_skip(queue, true);
+        self.jfa_pass.render(
+            encoder,
+            device,
+            queue,
+            self.scene_texture.view(),
+            &self.texture1,
+            2.0f32.powi((passes - 1) as i32),
+            &self.quad_render_pass,
+        );
+        let mut i = 1;
+        self.jfa_pass.set_skip(queue, false);
+        while i < passes || (passes == 0 && i == 0) {
+            let texture1 = if i % 2 == 0 {
+                &self.texture1
+            } else {
+                &self.texture2
+            };
+            let texture2 = if i % 2 == 0 {
+                &self.texture2
+            } else {
+                &self.texture1
+            };
+            self.jfa_pass.render(
+                encoder,
+                device,
+                queue,
+                texture1,
+                texture2,
+                2.0f32.powi((passes - i - 1) as i32),
+                &self.quad_render_pass,
+            );
+            i += 1;
+        }
+
         self.radiance_pass.render(
             encoder,
             device,

@@ -60,7 +60,7 @@ impl SceneTexture {
         let (texture, texture_view) = create_texture(device, width, height);
         let texture_data = create_texture_data(width, height);
         let size_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some(&"Size Buffer"),
+            label: Some("Size Buffer"),
             contents: bytemuck::bytes_of(&Vec2::new(width as f32, height as f32)),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
@@ -174,5 +174,5 @@ impl SceneTexture {
 fn padded_bytes_per_row(unpadded_row_bytes: u32) -> u32 {
     // WebGPU requires bytes_per_row be a multiple of 256
     const ALIGN: u32 = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-    ((unpadded_row_bytes + ALIGN - 1) / ALIGN) * ALIGN
+    unpadded_row_bytes.div_ceil(ALIGN) * ALIGN
 }

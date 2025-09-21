@@ -2,6 +2,7 @@
 @group(0) @binding(1) var input_texture: texture_2d<f32>;
 @group(0) @binding(2) var<uniform> one_over_size: vec2<f32>;
 @group(0) @binding(3) var<uniform> u_offset: f32;
+@group(0) @binding(4) var<uniform> skip: f32;
 
 struct VertexOutput {
     @builtin(position) clip_pos: vec4<f32>,
@@ -10,6 +11,7 @@ struct VertexOutput {
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+    if bool(skip) {return vec4(input.uv, 0.0, 1.0);}
     var nearestSeed = vec4(-2.0);
     var nearestDist = 999999.9;
 

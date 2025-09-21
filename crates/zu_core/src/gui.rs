@@ -1,13 +1,9 @@
 use crate::render_passes::render_pass_manager::RenderOptions;
 use crate::widgets::usage_diagnostics::UsageDiagnostics;
 use egui::Context;
-use egui::Label;
 use egui::Widget;
-use egui_probe::EguiProbe;
 use egui_probe::Probe;
-use egui_probe::Style;
 use glam::Vec2;
-use glam::Vec4;
 
 pub struct EngineGui {
     egui_context: Context,

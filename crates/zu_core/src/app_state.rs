@@ -1,15 +1,14 @@
 use crate::camera::Camera;
 use crate::egui_tools::EguiRenderer;
 use crate::gui::EngineGui;
-use crate::render_passes::radiance_render_pass::RadianceRenderPass;
 
-use crate::render_passes::render_pass_manager::{self, RenderPassManager};
-use crate::styles::{default_dark::default_dark_theme, gruvbox_egui::gruvbox_dark_theme};
+use crate::render_passes::render_pass_manager::RenderPassManager;
+use crate::styles::default_dark::default_dark_theme;
 use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
 use glam::Vec2;
 use log::info;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use winit::event::WindowEvent;
 
