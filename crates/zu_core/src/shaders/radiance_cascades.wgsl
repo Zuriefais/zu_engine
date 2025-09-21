@@ -8,35 +8,14 @@
 @group(0) @binding(5) var<uniform> max_steps: i32;
 @group(0) @binding(6) var<uniform> enable_noise: i32;
 
-// Vertex input
-struct VertexInput {
-    @location(0) position: vec2<f32>, // from QuadVertex
-};
 
-// Vertex output / fragment input
 struct VertexOutput {
     @builtin(position) clip_pos: vec4<f32>,
     @location(0) uv: vec2<f32>,
 };
 
-@vertex
-fn vs_main(input: VertexInput) -> VertexOutput {
-    var out: VertexOutput;
-
-    // Map vertex positions to clip space (-1..1)
-    out.clip_pos = vec4<f32>(input.position * 2.0, 0.0, 1.0);
-
-    // Map quad positions (-0.5..0.5) to UVs (0..1)
-    out.uv = input.position + vec2<f32>(0.5, 0.5);
-
-    return out;
-}
-
-
 const PI: f32 = 3.14159265;
 const TAU: f32 = 2.0 * PI;
-
-
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {

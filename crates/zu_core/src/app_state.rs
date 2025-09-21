@@ -1,7 +1,7 @@
 use crate::camera::Camera;
 use crate::egui_tools::EguiRenderer;
-use crate::fragment_render_pass::FragmentRenderPass;
 use crate::gui::EngineGui;
+use crate::radiance_render_pass::FragmentRenderPass;
 
 use crate::styles::{default_dark::default_dark_theme, gruvbox_egui::gruvbox_dark_theme};
 use egui_wgpu::wgpu::SurfaceError;

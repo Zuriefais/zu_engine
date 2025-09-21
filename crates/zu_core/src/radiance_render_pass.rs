@@ -4,7 +4,8 @@ use log::info;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferDescriptor, BufferUsages,
-    CommandEncoder, Device, Queue, ShaderStages, Texture, TextureView, VertexBufferLayout,
+    CommandEncoder, Device, Queue, ShaderModuleDescriptor, ShaderStages, Texture, TextureView,
+    VertexBufferLayout,
     util::{BufferInitDescriptor, DeviceExt},
 };
 
@@ -133,8 +134,10 @@ impl FragmentRenderPass {
         width: u32,
         height: u32,
     ) -> Self {
-        let shader =
-            device.create_shader_module(wgpu::include_wgsl!("../shaders/radiance_cascades.wgsl"));
+        let radiance_shader =
+            device.create_shader_module(wgpu::include_wgsl!("./shaders/radiance_cascades.wgsl"));
+        let quad_vertex_shader =
+            device.create_shader_module(wgpu::include_wgsl!("./shaders/quad_vertex.wgsl"));
 
         let (texture, texture_view) = create_texture(width, height, device);
         let (
@@ -280,14 +283,14 @@ impl FragmentRenderPass {
             label: Some("Render Pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &shader,
+                module: &quad_vertex_shader,
                 entry_point: Some("vs_main"),   // 1.
                 buffers: &[QuadVertex::desc()], // 2.
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 // 3.
-                module: &shader,
+                module: &radiance_shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     // 4.
