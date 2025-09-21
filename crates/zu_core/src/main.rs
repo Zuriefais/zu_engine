@@ -4,6 +4,7 @@ pub mod camera;
 mod egui_tools;
 mod gui;
 mod render_passes;
+mod scene_texture;
 mod styles;
 mod widgets;
 

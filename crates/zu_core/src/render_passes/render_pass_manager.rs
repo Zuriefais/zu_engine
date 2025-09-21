@@ -2,9 +2,12 @@ use egui_probe::EguiProbe;
 use glam::Vec2;
 use wgpu::{CommandEncoder, Device, Queue, TextureView};
 
-use crate::render_passes::{
-    quad_vertex::QuadVertexRenderPass,
-    radiance_render_pass::{RadianceRenderPass, RadiansOptions},
+use crate::{
+    render_passes::{
+        quad_vertex::QuadVertexRenderPass,
+        radiance_render_pass::{RadianceRenderPass, RadiansOptions},
+    },
+    scene_texture::{self, SceneTexture},
 };
 
 #[derive(Debug, Default, Copy, Clone, EguiProbe)]
@@ -16,6 +19,7 @@ pub struct RenderPassManager {
     radiance_pass: RadianceRenderPass,
     quad_render_pass: QuadVertexRenderPass,
     render_options: RenderOptions,
+    scene_texture: SceneTexture,
 }
 
 impl RenderPassManager {
@@ -26,17 +30,27 @@ impl RenderPassManager {
         height: u32,
     ) -> RenderPassManager {
         let quad_render_pass = QuadVertexRenderPass::new(device);
-        let radiance_pass =
-            RadianceRenderPass::new(device, config, width, height, &quad_render_pass);
+        let scene_texture = SceneTexture::new(width, height, device);
+        let radiance_pass = RadianceRenderPass::new(
+            device,
+            config,
+            width,
+            height,
+            &quad_render_pass,
+            &scene_texture,
+        );
         Self {
             radiance_pass,
             quad_render_pass,
             render_options: Default::default(),
+            scene_texture,
         }
     }
 
     pub fn resize(&mut self, width: u32, height: u32, device: &Device, queue: &Queue) {
-        self.radiance_pass.resize(width, height, device, queue);
+        self.scene_texture.resize(width, height, device);
+        self.radiance_pass
+            .resize(width, height, device, queue, &self.scene_texture);
     }
 
     pub fn render(
@@ -69,7 +83,7 @@ impl RenderPassManager {
         height: u32,
         queue: &Queue,
     ) {
-        self.radiance_pass
+        self.scene_texture
             .paint(pos, color, brush_radius, width, height, queue);
     }
 }
