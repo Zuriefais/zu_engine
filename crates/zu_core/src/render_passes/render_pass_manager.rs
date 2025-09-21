@@ -8,6 +8,7 @@ use crate::{
         quad_vertex::QuadVertexRenderPass,
         radiance_render_pass::{RadianceRenderPass, RadiansOptions},
         seed_pass::{self, SeedRenderPass},
+        show_pass::{self, ShowRenderPass},
     },
     scene_texture::SceneTexture,
 };
@@ -35,9 +36,17 @@ fn create_texture(device: &Device, width: u32, height: u32) -> TextureView {
 }
 
 #[derive(Debug, Copy, Clone, EguiProbe)]
+enum TextureOption {
+    Texture1,
+    Texture2,
+    Texture3,
+}
+
+#[derive(Debug, Copy, Clone, EguiProbe)]
 pub struct RenderOptions {
     radians_options: RadiansOptions,
     jfa_passes_count: u32,
+    show: TextureOption,
 }
 
 impl Default for RenderOptions {
@@ -45,6 +54,7 @@ impl Default for RenderOptions {
         Self {
             radians_options: Default::default(),
             jfa_passes_count: 9,
+            show: TextureOption::Texture3,
         }
     }
 }
@@ -53,11 +63,13 @@ pub struct RenderPassManager {
     jfa_pass: JfaRenderPass,
     seed_pass: SeedRenderPass,
     radiance_pass: RadianceRenderPass,
+    show_pass: ShowRenderPass,
     quad_render_pass: QuadVertexRenderPass,
     render_options: RenderOptions,
     scene_texture: SceneTexture,
     texture1: TextureView,
     texture2: TextureView,
+    texture3: TextureView,
 }
 
 impl RenderPassManager {
@@ -70,6 +82,7 @@ impl RenderPassManager {
         let quad_render_pass = QuadVertexRenderPass::new(device);
         let jfa_pass = JfaRenderPass::new(device, config, width, height, &quad_render_pass);
         let seed_pass = SeedRenderPass::new(device, config, width, height, &quad_render_pass);
+        let show_pass = ShowRenderPass::new(device, config, width, height, &quad_render_pass);
         let scene_texture = SceneTexture::new(width, height, device);
         let radiance_pass = RadianceRenderPass::new(
             device,
@@ -79,7 +92,8 @@ impl RenderPassManager {
             &quad_render_pass,
             &scene_texture,
         );
-        let (texture1, texture2) = (
+        let (texture1, texture2, texture3) = (
+            create_texture(device, width, height),
             create_texture(device, width, height),
             create_texture(device, width, height),
         );
@@ -91,7 +105,9 @@ impl RenderPassManager {
             scene_texture,
             texture1,
             texture2,
+            texture3,
             seed_pass,
+            show_pass,
         }
     }
 
@@ -100,10 +116,11 @@ impl RenderPassManager {
         self.jfa_pass.resize(width, height, queue);
         self.radiance_pass
             .resize(width, height, device, queue, &self.scene_texture);
-        (self.texture1, self.texture2) = (
+        (self.texture1, self.texture2, self.texture3) = (
             create_texture(device, width, height),
             create_texture(device, width, height),
-        );
+            create_texture(device, width, height),
+        )
     }
 
     pub fn render(
@@ -122,15 +139,10 @@ impl RenderPassManager {
             &self.quad_render_pass,
         );
         for i in 0..passes {
-            let texture1 = if i % 2 == 0 {
-                &self.texture1
+            let (texture1, texture2) = if i % 2 == 0 {
+                (&self.texture1, &self.texture2)
             } else {
-                &self.texture2
-            };
-            let texture2 = if i % 2 == 0 {
-                &self.texture2
-            } else {
-                &self.texture1
+                (&self.texture2, &self.texture1)
             };
             self.jfa_pass.render(
                 encoder,
@@ -147,8 +159,20 @@ impl RenderPassManager {
             encoder,
             device,
             queue,
-            view,
+            &self.texture3,
             self.render_options.radians_options,
+            &self.quad_render_pass,
+        );
+        let target_texture = match self.render_options.show {
+            TextureOption::Texture1 => &self.texture1,
+            TextureOption::Texture2 => &self.texture2,
+            TextureOption::Texture3 => &self.texture3,
+        };
+        self.show_pass.render(
+            encoder,
+            device,
+            target_texture,
+            view,
             &self.quad_render_pass,
         );
     }

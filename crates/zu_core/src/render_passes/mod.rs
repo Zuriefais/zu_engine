@@ -5,3 +5,4 @@ pub mod quad_vertex;
 pub mod radiance_render_pass;
 pub mod render_pass_manager;
 pub mod seed_pass;
+pub mod show_pass;
