@@ -4,6 +4,7 @@ use wgpu::{CommandEncoder, Device, Queue, Texture, TextureView};
 
 use crate::{
     render_passes::{
+        distant_field_pass::{self, DistantFieldPass},
         jfa_pass::{self, JfaRenderPass},
         quad_vertex::QuadVertexRenderPass,
         radiance_render_old_pass::{RadianceRenderOLDPass, RadiansOptions},
@@ -40,6 +41,7 @@ enum TextureOption {
     SceneTexture,
     Texture1,
     Texture2,
+    DistanceField,
     RadiansCascadesOld,
 }
 
@@ -66,12 +68,15 @@ pub struct RenderPassManager {
     jfa_pass: JfaRenderPass,
     seed_pass: SeedRenderPass,
     radiance_old_pass: RadianceRenderOLDPass,
+    distant_field_pass: DistantFieldPass,
     show_pass: ShowRenderPass,
     quad_render_pass: QuadVertexRenderPass,
     render_options: RenderOptions,
     scene_texture: SceneTexture,
     texture1: TextureView,
     texture2: TextureView,
+    distant_field_texture: TextureView,
+
     radians_cascades_old: TextureView,
 }
 
@@ -86,6 +91,8 @@ impl RenderPassManager {
         let jfa_pass = JfaRenderPass::new(device, config, width, height, &quad_render_pass);
         let seed_pass = SeedRenderPass::new(device, config, width, height, &quad_render_pass);
         let show_pass = ShowRenderPass::new(device, config, width, height, &quad_render_pass);
+        let distant_field_pass =
+            DistantFieldPass::new(device, config, width, height, &quad_render_pass);
         let scene_texture = SceneTexture::new(width, height, device);
         let radiance_old_pass = RadianceRenderOLDPass::new(
             device,
@@ -95,7 +102,8 @@ impl RenderPassManager {
             &quad_render_pass,
             &scene_texture,
         );
-        let (texture1, texture2, radians_cascades_old) = (
+        let (texture1, texture2, radians_cascades_old, distant_field_texture) = (
+            create_texture(device, width, height),
             create_texture(device, width, height),
             create_texture(device, width, height),
             create_texture(device, width, height),
@@ -111,6 +119,8 @@ impl RenderPassManager {
             radians_cascades_old,
             seed_pass,
             show_pass,
+            distant_field_pass,
+            distant_field_texture,
         }
     }
 
@@ -119,7 +129,13 @@ impl RenderPassManager {
         self.jfa_pass.resize(width, height, queue);
         self.radiance_old_pass
             .resize(width, height, device, queue, &self.scene_texture);
-        (self.texture1, self.texture2, self.radians_cascades_old) = (
+        (
+            self.texture1,
+            self.texture2,
+            self.radians_cascades_old,
+            self.distant_field_texture,
+        ) = (
+            create_texture(device, width, height),
             create_texture(device, width, height),
             create_texture(device, width, height),
             create_texture(device, width, height),
@@ -157,6 +173,14 @@ impl RenderPassManager {
                 &self.quad_render_pass,
             );
         }
+        self.distant_field_pass.render(
+            encoder,
+            device,
+            &self.texture2,
+            &self.distant_field_texture,
+            &self.quad_render_pass,
+        );
+
         if self.render_options.radians_old_enabled {
             self.radiance_old_pass.render(
                 encoder,
@@ -172,6 +196,7 @@ impl RenderPassManager {
             TextureOption::Texture2 => &self.texture2,
             TextureOption::RadiansCascadesOld => &self.radians_cascades_old,
             TextureOption::SceneTexture => &self.scene_texture.view(),
+            TextureOption::DistanceField => &self.distant_field_texture,
         };
         self.show_pass.render(
             encoder,

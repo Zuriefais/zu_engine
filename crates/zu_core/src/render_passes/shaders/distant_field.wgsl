@@ -1,6 +1,5 @@
 @group(0) @binding(0) var my_sampler: sampler;
 @group(0) @binding(1) var jfa_texture: texture_2d<f32>;
-@group(0) @binding(2) var<uniform> size: vec2<f32>;
 
 struct VertexOutput {
     @builtin(position) clip_pos: vec4<f32>,
