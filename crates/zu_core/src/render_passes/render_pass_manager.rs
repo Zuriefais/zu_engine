@@ -6,7 +6,7 @@ use crate::{
     render_passes::{
         jfa_pass::{self, JfaRenderPass},
         quad_vertex::QuadVertexRenderPass,
-        radiance_render_pass::{RadianceRenderPass, RadiansOptions},
+        radiance_render_old_pass::{RadianceRenderOLDPass, RadiansOptions},
         seed_pass::{self, SeedRenderPass},
         show_pass::{self, ShowRenderPass},
     },
@@ -37,14 +37,16 @@ fn create_texture(device: &Device, width: u32, height: u32) -> TextureView {
 
 #[derive(Debug, Copy, Clone, EguiProbe)]
 enum TextureOption {
+    SceneTexture,
     Texture1,
     Texture2,
-    Texture3,
+    RadiansCascadesOld,
 }
 
 #[derive(Debug, Copy, Clone, EguiProbe)]
 pub struct RenderOptions {
     radians_options: RadiansOptions,
+    radians_old_enabled: bool,
     jfa_passes_count: u32,
     show: TextureOption,
 }
@@ -54,7 +56,8 @@ impl Default for RenderOptions {
         Self {
             radians_options: Default::default(),
             jfa_passes_count: 9,
-            show: TextureOption::Texture3,
+            radians_old_enabled: true,
+            show: TextureOption::RadiansCascadesOld,
         }
     }
 }
@@ -62,14 +65,14 @@ impl Default for RenderOptions {
 pub struct RenderPassManager {
     jfa_pass: JfaRenderPass,
     seed_pass: SeedRenderPass,
-    radiance_pass: RadianceRenderPass,
+    radiance_old_pass: RadianceRenderOLDPass,
     show_pass: ShowRenderPass,
     quad_render_pass: QuadVertexRenderPass,
     render_options: RenderOptions,
     scene_texture: SceneTexture,
     texture1: TextureView,
     texture2: TextureView,
-    texture3: TextureView,
+    radians_cascades_old: TextureView,
 }
 
 impl RenderPassManager {
@@ -84,7 +87,7 @@ impl RenderPassManager {
         let seed_pass = SeedRenderPass::new(device, config, width, height, &quad_render_pass);
         let show_pass = ShowRenderPass::new(device, config, width, height, &quad_render_pass);
         let scene_texture = SceneTexture::new(width, height, device);
-        let radiance_pass = RadianceRenderPass::new(
+        let radiance_old_pass = RadianceRenderOLDPass::new(
             device,
             config,
             width,
@@ -92,20 +95,20 @@ impl RenderPassManager {
             &quad_render_pass,
             &scene_texture,
         );
-        let (texture1, texture2, texture3) = (
+        let (texture1, texture2, radians_cascades_old) = (
             create_texture(device, width, height),
             create_texture(device, width, height),
             create_texture(device, width, height),
         );
         Self {
             jfa_pass,
-            radiance_pass,
+            radiance_old_pass,
             quad_render_pass,
             render_options: Default::default(),
             scene_texture,
             texture1,
             texture2,
-            texture3,
+            radians_cascades_old,
             seed_pass,
             show_pass,
         }
@@ -114,9 +117,9 @@ impl RenderPassManager {
     pub fn resize(&mut self, width: u32, height: u32, device: &Device, queue: &Queue) {
         self.scene_texture.resize(width, height, device);
         self.jfa_pass.resize(width, height, queue);
-        self.radiance_pass
+        self.radiance_old_pass
             .resize(width, height, device, queue, &self.scene_texture);
-        (self.texture1, self.texture2, self.texture3) = (
+        (self.texture1, self.texture2, self.radians_cascades_old) = (
             create_texture(device, width, height),
             create_texture(device, width, height),
             create_texture(device, width, height),
@@ -154,19 +157,21 @@ impl RenderPassManager {
                 &self.quad_render_pass,
             );
         }
-
-        self.radiance_pass.render(
-            encoder,
-            device,
-            queue,
-            &self.texture3,
-            self.render_options.radians_options,
-            &self.quad_render_pass,
-        );
+        if self.render_options.radians_old_enabled {
+            self.radiance_old_pass.render(
+                encoder,
+                device,
+                queue,
+                &self.radians_cascades_old,
+                self.render_options.radians_options,
+                &self.quad_render_pass,
+            );
+        }
         let target_texture = match self.render_options.show {
             TextureOption::Texture1 => &self.texture1,
             TextureOption::Texture2 => &self.texture2,
-            TextureOption::Texture3 => &self.texture3,
+            TextureOption::RadiansCascadesOld => &self.radians_cascades_old,
+            TextureOption::SceneTexture => &self.scene_texture.view(),
         };
         self.show_pass.render(
             encoder,

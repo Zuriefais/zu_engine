@@ -51,7 +51,7 @@ fn create_buffers(
     )
 }
 
-pub struct RadianceRenderPass {
+pub struct RadianceRenderOLDPass {
     render_pipeline: wgpu::RenderPipeline,
     texture_bind_group: BindGroup,
     ray_count_buffer: Buffer,
@@ -63,7 +63,7 @@ pub struct RadianceRenderPass {
     bind_group_layout: wgpu::BindGroupLayout,
 }
 
-impl RadianceRenderPass {
+impl RadianceRenderOLDPass {
     pub fn new(
         device: &Device,
         config: &wgpu::SurfaceConfiguration,
@@ -72,8 +72,8 @@ impl RadianceRenderPass {
         quad_render_pass: &QuadVertexRenderPass,
         scene_texture: &SceneTexture,
     ) -> Self {
-        let radiance_shader =
-            device.create_shader_module(wgpu::include_wgsl!("./shaders/radiance_cascades.wgsl"));
+        let radiance_shader = device
+            .create_shader_module(wgpu::include_wgsl!("./shaders/radiance_cascades_old.wgsl"));
 
         let (
             ray_count_buffer,
@@ -252,7 +252,7 @@ impl RadianceRenderPass {
             cache: None,     // 6.
         });
 
-        RadianceRenderPass {
+        RadianceRenderOLDPass {
             render_pipeline,
 
             texture_bind_group,
