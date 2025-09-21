@@ -1,4 +1,5 @@
 use bytemuck::{Pod, Zeroable};
+use egui_probe::EguiProbe;
 use glam::{Vec2, Vec4};
 use log::info;
 use wgpu::{
@@ -9,46 +10,11 @@ use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
 };
 
-use crate::camera::{Camera, CameraUniform};
-
-#[repr(C)]
-#[derive(Clone, Copy, Pod, Zeroable)]
-struct QuadVertex {
-    position: Vec2,
-}
-
-impl QuadVertex {
-    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        use std::mem;
-        wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<QuadVertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex, // per-vertex
-            attributes: &[wgpu::VertexAttribute {
-                offset: 0,
-                shader_location: 0, // matches @location(0)
-                format: wgpu::VertexFormat::Float32x2,
-            }],
-        }
-    }
-}
-
-// a unit quad (two triangles)
-const QUAD_VERTICES: &[QuadVertex] = &[
-    QuadVertex {
-        position: Vec2::new(-0.5, -0.5),
-    },
-    QuadVertex {
-        position: Vec2::new(0.5, -0.5),
-    },
-    QuadVertex {
-        position: Vec2::new(0.5, 0.5),
-    },
-    QuadVertex {
-        position: Vec2::new(-0.5, 0.5),
-    },
-];
-
-const QUAD_INDICES: &[u16] = &[0, 1, 2, 0, 2, 3];
+use crate::{
+    camera::{Camera, CameraUniform},
+    render_passes::quad_vertex::QuadVertexRenderPass,
+    vertex_state_for_quad,
+};
 
 fn create_texture(width: u32, height: u32, device: &Device) -> (Texture, TextureView) {
     let texture_size = wgpu::Extent3d {
@@ -109,15 +75,12 @@ fn create_buffers(
     )
 }
 
-pub struct FragmentRenderPass {
+pub struct RadianceRenderPass {
     render_pipeline: wgpu::RenderPipeline,
     texture_bind_group: BindGroup,
     texture: Texture,
     texture_view: TextureView,
     texture_data: Vec<u8>,
-    vertex_buffer: Buffer,
-    index_buffer: Buffer,
-    index_count: u32,
     ray_count_buffer: Buffer,
     size_buffer: Buffer,
     accum_radiance_buffer: Buffer,
@@ -127,17 +90,16 @@ pub struct FragmentRenderPass {
     bind_group_layout: wgpu::BindGroupLayout,
 }
 
-impl FragmentRenderPass {
+impl RadianceRenderPass {
     pub fn new(
         device: &Device,
         config: &wgpu::SurfaceConfiguration,
         width: u32,
         height: u32,
+        quad_render_pass: &QuadVertexRenderPass,
     ) -> Self {
         let radiance_shader =
             device.create_shader_module(wgpu::include_wgsl!("./shaders/radiance_cascades.wgsl"));
-        let quad_vertex_shader =
-            device.create_shader_module(wgpu::include_wgsl!("./shaders/quad_vertex.wgsl"));
 
         let (texture, texture_view) = create_texture(width, height, device);
         let (
@@ -282,12 +244,7 @@ impl FragmentRenderPass {
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render Pipeline"),
             layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &quad_vertex_shader,
-                entry_point: Some("vs_main"),   // 1.
-                buffers: &[QuadVertex::desc()], // 2.
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
+            vertex: vertex_state_for_quad!(quad_render_pass),
             fragment: Some(wgpu::FragmentState {
                 // 3.
                 module: &radiance_shader,
@@ -322,26 +279,12 @@ impl FragmentRenderPass {
             cache: None,     // 6.
         });
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Quad Vertex Buffer"),
-            contents: bytemuck::cast_slice(QUAD_VERTICES),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Quad Index Buffer"),
-            contents: bytemuck::cast_slice(QUAD_INDICES),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-        let index_count = QUAD_INDICES.len() as u32;
-
-        FragmentRenderPass {
+        RadianceRenderPass {
             render_pipeline,
             texture,
             texture_bind_group,
             texture_view,
-            index_buffer,
-            index_count,
-            vertex_buffer,
+
             texture_data: vec![],
             ray_count_buffer,
             size_buffer,
@@ -450,30 +393,28 @@ impl FragmentRenderPass {
         device: &Device,
         queue: &Queue,
         view: &TextureView,
-        ray_count: u32,
-        accum_radiance: bool,
-        max_steps: u32,
-        enable_noise: bool,
+        options: RadiansOptions,
+        quad_render_pass: &QuadVertexRenderPass,
     ) {
         queue.write_buffer(
             &self.ray_count_buffer,
             0,
-            bytemuck::bytes_of(&(ray_count as i32)),
+            bytemuck::bytes_of(&(options.ray_count as i32)),
         );
         queue.write_buffer(
             &self.accum_radiance_buffer,
             0,
-            bytemuck::bytes_of(&(accum_radiance as i32)), // Convert bool to i32 for WGSL
+            bytemuck::bytes_of(&(options.accum_radiance as i32)), // Convert bool to i32 for WGSL
         );
         queue.write_buffer(
             &self.enable_noise_buffer,
             0,
-            bytemuck::bytes_of(&(enable_noise as i32)), // Convert bool to i32 for WGSL
+            bytemuck::bytes_of(&(options.enable_noise as i32)), // Convert bool to i32 for WGSL
         );
         queue.write_buffer(
             &self.max_steps_buffer,
             0,
-            bytemuck::bytes_of(&(max_steps as i32)),
+            bytemuck::bytes_of(&(options.max_steps as i32)),
         );
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -501,9 +442,7 @@ impl FragmentRenderPass {
 
         render_pass.set_pipeline(&self.render_pipeline); // 2.
         render_pass.set_bind_group(0, &self.texture_bind_group, &[]);
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        render_pass.draw_indexed(0..self.index_count, 0, 0..1);
+        quad_render_pass.render(&mut render_pass);
     }
 
     pub fn paint(
@@ -598,4 +537,23 @@ fn padded_bytes_per_row(unpadded_row_bytes: u32) -> u32 {
     // WebGPU requires bytes_per_row be a multiple of 256
     const ALIGN: u32 = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
     ((unpadded_row_bytes + ALIGN - 1) / ALIGN) * ALIGN
+}
+
+#[derive(Debug, Clone, Copy, EguiProbe)]
+pub struct RadiansOptions {
+    ray_count: u32,
+    accum_radiance: bool,
+    max_steps: u32,
+    enable_noise: bool,
+}
+
+impl Default for RadiansOptions {
+    fn default() -> Self {
+        Self {
+            ray_count: 8,
+            accum_radiance: true,
+            max_steps: 128,
+            enable_noise: true,
+        }
+    }
 }

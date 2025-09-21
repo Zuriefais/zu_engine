@@ -1,7 +1,11 @@
+use crate::render_passes::render_pass_manager::RenderOptions;
 use crate::widgets::usage_diagnostics::UsageDiagnostics;
 use egui::Context;
 use egui::Label;
 use egui::Widget;
+use egui_probe::EguiProbe;
+use egui_probe::Probe;
+use egui_probe::Style;
 use glam::Vec2;
 use glam::Vec4;
 
@@ -22,10 +26,7 @@ impl EngineGui {
         paint: &mut bool,
         pointer_pos: &mut Vec2,
         brush_radius: &mut u32,
-        ray_count: &mut u32,
-        accum_radiance: &mut bool,
-        max_steps: &mut u32,
-        enable_noise: &mut bool,
+        render_options: &mut RenderOptions,
     ) {
         *pointer_pos = {
             if let Some(pos) = self.egui_context.pointer_latest_pos() {
@@ -41,10 +42,7 @@ impl EngineGui {
         egui::Window::new("Engine Window").show(&self.egui_context, |ui| {
             ui.color_edit_button_rgba_unmultiplied(color);
             ui.add(egui::Slider::new(brush_radius, 0..=120).text("brush radius"));
-            ui.add(egui::Slider::new(ray_count, 0..=64).text("ray count"));
-            ui.add(egui::Slider::new(max_steps, 0..=512).text("max steps"));
-            ui.checkbox(accum_radiance, "Accum radiance");
-            ui.checkbox(enable_noise, "Enable noise");
+            Probe::new(render_options).show(ui);
             UsageDiagnostics {}.ui(ui);
         });
     }

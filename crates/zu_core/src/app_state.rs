@@ -1,8 +1,9 @@
 use crate::camera::Camera;
 use crate::egui_tools::EguiRenderer;
 use crate::gui::EngineGui;
-use crate::radiance_render_pass::FragmentRenderPass;
+use crate::render_passes::radiance_render_pass::RadianceRenderPass;
 
+use crate::render_passes::render_pass_manager::{self, RenderPassManager};
 use crate::styles::{default_dark::default_dark_theme, gruvbox_egui::gruvbox_dark_theme};
 use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
@@ -25,16 +26,12 @@ pub struct AppState {
     pub egui_renderer: EguiRenderer,
     pub engine_gui: EngineGui,
     pub window: Arc<Window>,
-    pub fragment_render_pass: FragmentRenderPass,
     pub camera: Camera,
     color: [f32; 4],
     paint: bool,
     mouse_pos: Vec2,
     brush_radius: u32,
-    ray_count: u32,
-    accum_radiance: bool,
-    max_steps: u32,
-    enable_noise: bool,
+    render_pass_manager: RenderPassManager,
 }
 
 impl AppState {
@@ -125,7 +122,7 @@ impl AppState {
         let camera =
             Camera::from_screen_size(width as f32, height as f32, 0.1, 1000.0, 1.0, Vec2::ZERO);
 
-        let fragment_render_pass = FragmentRenderPass::new(&device, &surface_config, width, height);
+        let render_pass_manager = RenderPassManager::new(&device, &surface_config, width, height);
 
         info!("App State created!!");
 
@@ -138,16 +135,12 @@ impl AppState {
             scale_factor,
             engine_gui,
             window,
-            fragment_render_pass,
+            render_pass_manager,
             camera,
             paint: false,
             color: [1.0, 1.0, 1.0, 1.0],
             mouse_pos: Vec2::ZERO,
             brush_radius: 10,
-            ray_count: 8,
-            accum_radiance: true,
-            max_steps: 128,
-            enable_noise: true,
         })
     }
 
@@ -157,7 +150,7 @@ impl AppState {
         self.surface.configure(&self.device, &self.surface_config);
         self.camera
             .update_from_screen_size(width as f32, height as f32);
-        self.fragment_render_pass
+        self.render_pass_manager
             .resize(width, height, &self.device, &self.queue);
     }
 
@@ -167,7 +160,7 @@ impl AppState {
         let height = self.surface_config.height;
 
         if self.paint {
-            self.fragment_render_pass.paint(
+            self.render_pass_manager.paint(
                 self.mouse_pos,
                 self.color,
                 self.brush_radius,
@@ -203,16 +196,8 @@ impl AppState {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-        self.fragment_render_pass.render(
-            &mut encoder,
-            &self.device,
-            &self.queue,
-            &surface_view,
-            self.ray_count,
-            self.accum_radiance,
-            self.max_steps,
-            self.enable_noise,
-        );
+        self.render_pass_manager
+            .render(&surface_view, &mut encoder, &self.device, &self.queue);
 
         self.egui_renderer.begin_frame(window);
         self.engine_gui.render_gui(
@@ -220,10 +205,7 @@ impl AppState {
             &mut self.paint,
             &mut self.mouse_pos,
             &mut self.brush_radius,
-            &mut self.ray_count,
-            &mut self.accum_radiance,
-            &mut self.max_steps,
-            &mut self.enable_noise,
+            self.render_pass_manager.get_options(),
         );
         self.egui_renderer.end_frame_and_draw(
             &self.device,
