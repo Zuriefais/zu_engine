@@ -16,7 +16,10 @@ fn vs_main(input: VertexInput) -> VertexOutput {
     out.clip_pos = vec4<f32>(input.position * 2.0, 0.0, 1.0);
 
     // Map quad positions (-0.5..0.5) to UVs (0..1)
-    out.uv = input.position + vec2<f32>(0.5, 0.5);
+    out.uv = vec2(
+        input.position.x + 0.5,
+        1.0 - (input.position.y + 0.5)
+    );
 
     return out;
 }

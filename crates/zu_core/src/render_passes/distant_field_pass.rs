@@ -90,10 +90,7 @@ impl DistantFieldPass {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Distant field  Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &texture_manager
-                    .get_texture("JfaTexture2")
-                    .expect("Couldn't get DistantField texture")
-                    .view(),
+                view: distance_texture.view(),
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -106,7 +103,14 @@ impl DistantFieldPass {
         });
 
         render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.set_bind_group(0, distance_texture.bind_group(), &[]);
+        render_pass.set_bind_group(
+            0,
+            texture_manager
+                .get_texture("JfaTexture2")
+                .expect("Couldn't get DistantField texture")
+                .bind_group(),
+            &[],
+        );
         quad_render_pass.render(&mut render_pass);
     }
 }

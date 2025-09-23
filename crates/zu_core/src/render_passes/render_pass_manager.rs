@@ -108,8 +108,12 @@ impl RenderPassManager {
     pub fn render(&mut self, view: &TextureView, encoder: &mut CommandEncoder, device: &Device) {
         self.seed_pass
             .render(encoder, &self.texture_manager, &self.quad_render_pass);
-        self.jfa_pass
-            .multi_render(encoder, &self.quad_render_pass, &self.texture_manager);
+        self.jfa_pass.multi_render(
+            encoder,
+            &self.quad_render_pass,
+            &self.texture_manager,
+            self.render_options.jfa_passes_count as i32,
+        );
         self.distant_field_pass.render(
             encoder,
             device,

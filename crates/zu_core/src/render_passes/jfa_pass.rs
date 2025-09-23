@@ -147,8 +147,8 @@ impl JfaRenderPass {
         encoder: &mut CommandEncoder,
         quad_render_pass: &QuadVertexRenderPass,
         texture_manager: &TextureManager,
+        passes: i32,
     ) {
-        let passes = 9;
         let (texture1, texture2) = (
             texture_manager.get_texture_by_index(self.texture1).unwrap(),
             texture_manager.get_texture_by_index(self.texture2).unwrap(),
@@ -159,7 +159,7 @@ impl JfaRenderPass {
                 .get_texture("SceneTexture")
                 .unwrap()
                 .bind_group(),
-            &texture1.view(),
+            &texture2.view(),
             2.0f32.powi((passes - 1) as i32),
             &quad_render_pass,
         );
