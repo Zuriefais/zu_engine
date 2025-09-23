@@ -2,6 +2,7 @@ pub mod distant_field_pass;
 pub mod jfa_pass;
 pub mod object_render_pass;
 pub mod quad_vertex;
+pub mod radiance_render;
 pub mod radiance_render_old_pass;
 pub mod render_pass_manager;
 pub mod seed_pass;

@@ -21,16 +21,17 @@ struct RadiansCascadesConstants {
     accum_radiance: i32,
     max_steps: i32,
     enable_noise: i32,
+    show_grain: i32,
 }
 
-pub struct RadianceRenderOLDPass {
+pub struct RadianceRenderPass {
     render_pipeline: wgpu::RenderPipeline,
     width: u32,
     height: u32,
     radiance_texture: usize,
 }
 
-impl RadianceRenderOLDPass {
+impl RadianceRenderPass {
     pub fn new(
         device: &Device,
         width: u32,
@@ -38,13 +39,16 @@ impl RadianceRenderOLDPass {
         quad_render_pass: &QuadVertexRenderPass,
         texture_manager: &mut TextureManager,
     ) -> Self {
-        let radiance_shader = device
-            .create_shader_module(wgpu::include_wgsl!("./shaders/radiance_cascades_old.wgsl"));
+        let radiance_shader =
+            device.create_shader_module(wgpu::include_wgsl!("./shaders/radiance_cascades.wgsl"));
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[texture_manager.get_bind_group_layout()],
+                bind_group_layouts: &[
+                    texture_manager.get_bind_group_layout(),
+                    texture_manager.get_bind_group_layout(),
+                ],
                 push_constant_ranges: &[PushConstantRange {
                     stages: ShaderStages::FRAGMENT,
                     range: 0..std::mem::size_of::<RadiansCascadesConstants>() as u32,
@@ -89,13 +93,13 @@ impl RadianceRenderOLDPass {
             cache: None,     // 6.
         });
         let radiance_texture = texture_manager.create_texture(
-            "RadiansCascadesOLD",
+            "RadiansCascades",
             (width, height),
             device,
             texture_manager::TextureType::Standart,
         ) as usize;
 
-        RadianceRenderOLDPass {
+        RadianceRenderPass {
             render_pipeline,
             width,
             height,
@@ -111,7 +115,7 @@ impl RadianceRenderOLDPass {
     pub fn render(
         &mut self,
         encoder: &mut CommandEncoder,
-        options: RadiansOptionsOLD,
+        options: RadiansOptions,
         texture_manager: &TextureManager,
         quad_render_pass: &QuadVertexRenderPass,
     ) {
@@ -150,6 +154,7 @@ impl RadianceRenderOLDPass {
                 accum_radiance: options.accum_radiance as i32,
                 max_steps: options.max_steps as i32,
                 enable_noise: options.enable_noise as i32,
+                show_grain: options.show_grain as i32,
             }),
         );
         render_pass.set_bind_group(
@@ -160,25 +165,35 @@ impl RadianceRenderOLDPass {
                 .bind_group(),
             &[],
         );
+        render_pass.set_bind_group(
+            1,
+            texture_manager
+                .get_texture("DistanceField")
+                .unwrap()
+                .bind_group(),
+            &[],
+        );
         quad_render_pass.render(&mut render_pass);
     }
 }
 
 #[derive(Debug, Clone, Copy, EguiProbe)]
-pub struct RadiansOptionsOLD {
+pub struct RadiansOptions {
     ray_count: u32,
     accum_radiance: bool,
     max_steps: u32,
     enable_noise: bool,
+    show_grain: bool,
 }
 
-impl Default for RadiansOptionsOLD {
+impl Default for RadiansOptions {
     fn default() -> Self {
         Self {
             ray_count: 8,
             accum_radiance: true,
             max_steps: 128,
             enable_noise: true,
+            show_grain: true,
         }
     }
 }

@@ -161,7 +161,7 @@ impl SceneTexture {
         ];
 
         let center_x = pos.x as i32;
-        let center_y = (height as f32 - pos.y) as i32;
+        let center_y = pos.y as i32;
         let radius_sq = (brush_radius as i32).pow(2);
 
         info!("Painting at {}, {}, color: {:?}", center_x, center_y, rgba);

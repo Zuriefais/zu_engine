@@ -10,7 +10,8 @@ use crate::{
         distant_field_pass::{self, DistantFieldPass},
         jfa_pass::{self, JfaRenderPass},
         quad_vertex::QuadVertexRenderPass,
-        radiance_render_old_pass::{RadianceRenderOLDPass, RadiansOptions},
+        radiance_render::{self, RadianceRenderPass, RadiansOptions},
+        radiance_render_old_pass::{RadianceRenderOLDPass, RadiansOptionsOLD},
         seed_pass::{self, SeedRenderPass},
         show_pass::{self, ShowRenderPass},
     },
@@ -20,6 +21,7 @@ use crate::{
 #[derive(Debug, Clone, EguiProbe)]
 pub struct RenderOptions {
     radians_options: RadiansOptions,
+    radians_options_old: RadiansOptionsOLD,
     radians_old_enabled: bool,
     jfa_passes_count: u32,
     show: String,
@@ -29,9 +31,10 @@ impl Default for RenderOptions {
     fn default() -> Self {
         Self {
             radians_options: Default::default(),
+            radians_options_old: Default::default(),
             jfa_passes_count: 9,
-            radians_old_enabled: true,
-            show: "RadiansCascadesOld".into(),
+            radians_old_enabled: false,
+            show: "RadiansCascades".into(),
         }
     }
 }
@@ -40,6 +43,7 @@ pub struct RenderPassManager {
     jfa_pass: JfaRenderPass,
     seed_pass: SeedRenderPass,
     radiance_old_pass: RadianceRenderOLDPass,
+    radiance_pass: RadianceRenderPass,
     distant_field_pass: DistantFieldPass,
     show_pass: ShowRenderPass,
     quad_render_pass: QuadVertexRenderPass,
@@ -87,9 +91,18 @@ impl RenderPassManager {
             &mut texture_manager,
         );
 
+        let radiance_pass = RadianceRenderPass::new(
+            device,
+            width,
+            height,
+            &quad_render_pass,
+            &mut texture_manager,
+        );
+
         Self {
             jfa_pass,
             radiance_old_pass,
+            radiance_pass,
             quad_render_pass,
             render_options: Default::default(),
             seed_pass,
@@ -124,11 +137,17 @@ impl RenderPassManager {
         if self.render_options.radians_old_enabled {
             self.radiance_old_pass.render(
                 encoder,
-                self.render_options.radians_options,
+                self.render_options.radians_options_old,
                 &self.texture_manager,
                 &self.quad_render_pass,
             );
         }
+        self.radiance_pass.render(
+            encoder,
+            self.render_options.radians_options,
+            &self.texture_manager,
+            &self.quad_render_pass,
+        );
         if let Some(texture) = self.texture_manager.get_texture(&self.render_options.show) {
             self.show_pass
                 .render(encoder, texture.bind_group(), view, &self.quad_render_pass);
