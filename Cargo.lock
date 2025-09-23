@@ -3163,6 +3163,7 @@ dependencies = [
  "egui_extras",
  "env_logger",
  "glam",
+ "indexmap",
  "log",
  "parking_lot",
  "pollster",

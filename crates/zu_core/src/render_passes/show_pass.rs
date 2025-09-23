@@ -19,8 +19,6 @@ impl ShowRenderPass {
     pub fn new(
         device: &Device,
         config: &wgpu::SurfaceConfiguration,
-        width: u32,
-        height: u32,
         quad_render_pass: &QuadVertexRenderPass,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::include_wgsl!("./shaders/show_pass.wgsl"));
@@ -108,26 +106,10 @@ impl ShowRenderPass {
     pub fn render(
         &mut self,
         encoder: &mut CommandEncoder,
-        device: &Device,
-        input_texture: &TextureView,
+        input_texture: &BindGroup,
         output_view: &TextureView,
         quad_render_pass: &QuadVertexRenderPass,
     ) {
-        let bind_group = device.create_bind_group(&BindGroupDescriptor {
-            label: Some("show Bind Group (per-frame)"),
-            layout: &self.bind_group_layout,
-            entries: &[
-                BindGroupEntry {
-                    binding: 0,
-                    resource: BindingResource::Sampler(&self.sampler),
-                },
-                BindGroupEntry {
-                    binding: 1,
-                    resource: BindingResource::TextureView(input_texture),
-                },
-            ],
-        });
-
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("show  Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -144,7 +126,7 @@ impl ShowRenderPass {
         });
 
         render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.set_bind_group(0, &bind_group, &[]);
+        render_pass.set_bind_group(0, input_texture, &[]);
         quad_render_pass.render(&mut render_pass);
     }
 }

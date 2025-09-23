@@ -61,7 +61,7 @@ impl AppState {
             .await
             .expect("Unable request adapter");
 
-        let features = wgpu::Features::empty();
+        let features = wgpu::Features::PUSH_CONSTANTS;
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: None,
@@ -196,7 +196,7 @@ impl AppState {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
         self.render_pass_manager
-            .render(&surface_view, &mut encoder, &self.device, &self.queue);
+            .render(&surface_view, &mut encoder, &self.device);
 
         self.egui_renderer.begin_frame(window);
         self.engine_gui.render_gui(

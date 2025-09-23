@@ -1,217 +1,54 @@
+use bytemuck::{Pod, Zeroable, bytes_of};
 use egui_probe::EguiProbe;
 use glam::Vec2;
 use log::info;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindingResource, Buffer, BufferUsages,
-    CommandEncoder, Device, Queue, TextureView,
-    util::{BufferInitDescriptor, DeviceExt},
+    CommandEncoder, Device, PushConstantRange, Queue, ShaderStages, TextureView,
+    util::{BufferInitDescriptor, DeviceExt, RenderEncoder},
 };
 
 use crate::{
-    render_passes::quad_vertex::QuadVertexRenderPass, scene_texture::SceneTexture,
+    render_passes::quad_vertex::QuadVertexRenderPass,
+    texture_manager::{self, TextureManager},
     vertex_state_for_quad,
 };
 
-fn create_buffers(
-    device: &Device,
-    width: u32,
-    height: u32,
-) -> (Buffer, Buffer, Buffer, Buffer, Buffer) {
-    let ray_count_buffer = device.create_buffer_init(&BufferInitDescriptor {
-        label: Some("Ray Count Buffer"),
-        contents: bytemuck::bytes_of(&8i32), // Use i32 to match WGSL
-        usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-    });
-    let size_buffer = device.create_buffer_init(&BufferInitDescriptor {
-        label: Some("Size Buffer"),
-        contents: bytemuck::bytes_of(&Vec2::new(width as f32, height as f32)),
-        usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-    });
-    let accum_radiance_buffer = device.create_buffer_init(&BufferInitDescriptor {
-        label: Some("Accum Radiance Buffer"),
-        contents: bytemuck::bytes_of(&1i32), // Use i32 to match WGSL
-        usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-    });
-    let max_steps_buffer = device.create_buffer_init(&BufferInitDescriptor {
-        label: Some("Max Steps Buffer"),
-        contents: bytemuck::bytes_of(&128i32), // Use i32 to match WGSL
-        usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-    });
-    let enable_noise_buffer = device.create_buffer_init(&BufferInitDescriptor {
-        label: Some("Enable noise Buffer"),
-        contents: bytemuck::bytes_of(&1i32), // Use i32 to match WGSL
-        usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-    });
-    (
-        ray_count_buffer,
-        size_buffer,
-        accum_radiance_buffer,
-        max_steps_buffer,
-        enable_noise_buffer,
-    )
+#[repr(C)]
+#[derive(PartialEq, Debug, Clone, Copy, Zeroable, Pod)]
+struct RadiansCascadesConstants {
+    ray_count: i32,
+    size: Vec2,
+    accum_radiance: i32,
+    max_steps: i32,
+    enable_noise: i32,
 }
 
 pub struct RadianceRenderOLDPass {
     render_pipeline: wgpu::RenderPipeline,
-    texture_bind_group: BindGroup,
-    ray_count_buffer: Buffer,
-    size_buffer: Buffer,
-    accum_radiance_buffer: Buffer,
-    enable_noise_buffer: Buffer,
-    max_steps_buffer: Buffer,
-    sampler: wgpu::Sampler,
-    bind_group_layout: wgpu::BindGroupLayout,
+    width: u32,
+    height: u32,
 }
 
 impl RadianceRenderOLDPass {
     pub fn new(
         device: &Device,
-        config: &wgpu::SurfaceConfiguration,
         width: u32,
         height: u32,
         quad_render_pass: &QuadVertexRenderPass,
-        scene_texture: &SceneTexture,
+        texture_manager: &TextureManager,
     ) -> Self {
         let radiance_shader = device
             .create_shader_module(wgpu::include_wgsl!("./shaders/radiance_cascades_old.wgsl"));
 
-        let (
-            ray_count_buffer,
-            size_buffer,
-            accum_radiance_buffer,
-            max_steps_buffer,
-            enable_noise_buffer,
-        ) = create_buffers(device, width, height);
-
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
-        let texture_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("Radiance Cascades Bind Group Layout"),
-                entries: &[
-                    // Sampler
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        count: None,
-                    },
-                    // Texture
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
-                    },
-                    // ray_count
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    // size
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 3,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    // accum_radiance
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 4,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    // max_steps
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 5,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    // enable noise
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 6,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                ],
-            });
-
-        let texture_bind_group = device.create_bind_group(&BindGroupDescriptor {
-            label: Some("Radiance Cascades Bind Group"),
-            layout: &texture_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(scene_texture.view()),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: ray_count_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: size_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 4,
-                    resource: accum_radiance_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 5,
-                    resource: max_steps_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 6,
-                    resource: enable_noise_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[&texture_bind_group_layout],
-                push_constant_ranges: &[],
+                bind_group_layouts: &[texture_manager.get_bind_group_layout()],
+                push_constant_ranges: &[PushConstantRange {
+                    stages: ShaderStages::FRAGMENT,
+                    range: 0..std::mem::size_of::<RadiansCascadesConstants>() as u32,
+                }],
             });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -254,106 +91,32 @@ impl RadianceRenderOLDPass {
 
         RadianceRenderOLDPass {
             render_pipeline,
-
-            texture_bind_group,
-
-            ray_count_buffer,
-            size_buffer,
-            accum_radiance_buffer,
-            max_steps_buffer,
-            sampler,
-            bind_group_layout: texture_bind_group_layout,
-            enable_noise_buffer,
+            width,
+            height,
         }
     }
 
-    pub fn resize(
-        &mut self,
-        width: u32,
-        height: u32,
-        device: &Device,
-        queue: &Queue,
-        scene_texture: &SceneTexture,
-    ) {
-        queue.write_buffer(
-            &self.size_buffer,
-            0,
-            bytemuck::bytes_of(&Vec2::new(width as f32, height as f32)),
-        );
-
-        self.texture_bind_group = device.create_bind_group(&BindGroupDescriptor {
-            label: Some("Radiance Cascades Bind Group"),
-            layout: &self.bind_group_layout,
-            entries: &[
-                BindGroupEntry {
-                    binding: 0,
-                    resource: BindingResource::Sampler(&self.sampler),
-                },
-                BindGroupEntry {
-                    binding: 1,
-                    resource: BindingResource::TextureView(scene_texture.view()),
-                },
-                BindGroupEntry {
-                    binding: 2,
-                    resource: self.ray_count_buffer.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 3,
-                    resource: self.size_buffer.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 4,
-                    resource: self.accum_radiance_buffer.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 5,
-                    resource: self.max_steps_buffer.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 6,
-                    resource: self.enable_noise_buffer.as_entire_binding(),
-                },
-            ],
-        });
-        info!("Texture resized");
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.width = width;
+        self.height = height;
     }
 
     pub fn render(
         &mut self,
         encoder: &mut CommandEncoder,
-        device: &Device,
-        queue: &Queue,
-        view: &TextureView,
         options: RadiansOptions,
+        texture_manager: &TextureManager,
         quad_render_pass: &QuadVertexRenderPass,
     ) {
-        queue.write_buffer(
-            &self.ray_count_buffer,
-            0,
-            bytemuck::bytes_of(&(options.ray_count as i32)),
-        );
-        queue.write_buffer(
-            &self.accum_radiance_buffer,
-            0,
-            bytemuck::bytes_of(&(options.accum_radiance as i32)), // Convert bool to i32 for WGSL
-        );
-        queue.write_buffer(
-            &self.enable_noise_buffer,
-            0,
-            bytemuck::bytes_of(&(options.enable_noise as i32)), // Convert bool to i32 for WGSL
-        );
-        queue.write_buffer(
-            &self.max_steps_buffer,
-            0,
-            bytemuck::bytes_of(&(options.max_steps as i32)),
-        );
-
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Radiance render pass"),
             color_attachments: &[
                 // This is what @location(0) in the fragment shader targets
                 Some(wgpu::RenderPassColorAttachment {
-                    view,
+                    view: texture_manager
+                        .get_texture("RadiansCascadesOLD")
+                        .unwrap()
+                        .view(),
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -372,7 +135,25 @@ impl RadianceRenderOLDPass {
         });
 
         render_pass.set_pipeline(&self.render_pipeline); // 2.
-        render_pass.set_bind_group(0, &self.texture_bind_group, &[]);
+        render_pass.set_push_constants(
+            ShaderStages::FRAGMENT,
+            0,
+            bytes_of(&RadiansCascadesConstants {
+                ray_count: options.ray_count as i32,
+                size: Vec2::new(self.width as f32, self.height as f32),
+                accum_radiance: options.accum_radiance as i32,
+                max_steps: options.max_steps as i32,
+                enable_noise: options.enable_noise as i32,
+            }),
+        );
+        render_pass.set_bind_group(
+            0,
+            texture_manager
+                .get_texture("SceneTextures")
+                .unwrap()
+                .bind_group(),
+            &[],
+        );
         quad_render_pass.render(&mut render_pass);
     }
 }

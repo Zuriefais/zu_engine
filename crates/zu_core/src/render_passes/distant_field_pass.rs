@@ -6,63 +6,35 @@ use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
 };
 
-use crate::render_passes::quad_vertex::QuadVertexRenderPass;
 use crate::vertex_state_for_quad;
+use crate::{render_passes::quad_vertex::QuadVertexRenderPass, texture_manager::TextureManager};
 
 pub struct DistantFieldPass {
     render_pipeline: wgpu::RenderPipeline,
-    sampler: wgpu::Sampler,
-    bind_group_layout: wgpu::BindGroupLayout,
+    distance_field: usize,
 }
 
 impl DistantFieldPass {
     pub fn new(
         device: &Device,
-        config: &wgpu::SurfaceConfiguration,
+        quad_render_pass: &QuadVertexRenderPass,
         width: u32,
         height: u32,
-        quad_render_pass: &QuadVertexRenderPass,
+        texture_manager: &mut TextureManager,
     ) -> Self {
         let shader =
             device.create_shader_module(wgpu::include_wgsl!("./shaders/distant_field.wgsl"));
 
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
-
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Distant field Bind Group Layout"),
-            entries: &[
-                // sampler
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-                // texture
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-            ],
-        });
+        let distance_field = texture_manager.create_texture(
+            "DistanceField",
+            (width, height),
+            device,
+            crate::texture_manager::TextureType::Standart,
+        );
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Distant field Pipeline Layout"),
-            bind_group_layouts: &[&bind_group_layout],
+            bind_group_layouts: &[texture_manager.get_bind_group_layout()],
             push_constant_ranges: &[],
         });
 
@@ -101,8 +73,7 @@ impl DistantFieldPass {
 
         DistantFieldPass {
             render_pipeline,
-            sampler,
-            bind_group_layout,
+            distance_field,
         }
     }
 
@@ -110,29 +81,16 @@ impl DistantFieldPass {
         &mut self,
         encoder: &mut CommandEncoder,
         device: &Device,
-        input_texture: &TextureView,
-        output_view: &TextureView,
+        texture_manager: &TextureManager,
         quad_render_pass: &QuadVertexRenderPass,
     ) {
-        let bind_group = device.create_bind_group(&BindGroupDescriptor {
-            label: Some("Distant field Bind Group (per-frame)"),
-            layout: &self.bind_group_layout,
-            entries: &[
-                BindGroupEntry {
-                    binding: 0,
-                    resource: BindingResource::Sampler(&self.sampler),
-                },
-                BindGroupEntry {
-                    binding: 1,
-                    resource: BindingResource::TextureView(input_texture),
-                },
-            ],
-        });
-
+        let texture = texture_manager
+            .get_texture_by_index(self.distance_field)
+            .expect("Couldn't get DistantField texture");
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Distant field  Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: output_view,
+                view: &texture.view(),
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -145,7 +103,7 @@ impl DistantFieldPass {
         });
 
         render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.set_bind_group(0, &bind_group, &[]);
+        render_pass.set_bind_group(0, texture.bind_group(), &[]);
         quad_render_pass.render(&mut render_pass);
     }
 }

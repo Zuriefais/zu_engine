@@ -1,6 +1,9 @@
 use egui_probe::EguiProbe;
 use glam::Vec2;
-use wgpu::{CommandEncoder, Device, Queue, Texture, TextureView};
+use wgpu::{
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource,
+    CommandEncoder, Device, Queue, Sampler, Texture, TextureView,
+};
 
 use crate::{
     render_passes::{
@@ -11,10 +14,16 @@ use crate::{
         seed_pass::{self, SeedRenderPass},
         show_pass::{self, ShowRenderPass},
     },
-    scene_texture::SceneTexture,
+    texture_manager::{self, ManagedTexture, TextureManager},
 };
 
-fn create_texture(device: &Device, width: u32, height: u32) -> TextureView {
+fn create_texture(
+    device: &Device,
+    width: u32,
+    height: u32,
+    texture_bind_group_layout: &BindGroupLayout,
+    sampler: &Sampler,
+) -> (TextureView, BindGroup) {
     let texture_size = wgpu::Extent3d {
         width,
         height,
@@ -33,24 +42,29 @@ fn create_texture(device: &Device, width: u32, height: u32) -> TextureView {
         view_formats: &[],
     });
     let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    texture_view
+    let texture_bind_group = device.create_bind_group(&BindGroupDescriptor {
+        label: Some("Texture Bind Group"),
+        layout: texture_bind_group_layout,
+        entries: &[
+            BindGroupEntry {
+                binding: 0,
+                resource: BindingResource::Sampler(&sampler),
+            },
+            BindGroupEntry {
+                binding: 1,
+                resource: BindingResource::TextureView(&texture_view),
+            },
+        ],
+    });
+    (texture_view, texture_bind_group)
 }
 
-#[derive(Debug, Copy, Clone, EguiProbe)]
-enum TextureOption {
-    SceneTexture,
-    Texture1,
-    Texture2,
-    DistanceField,
-    RadiansCascadesOld,
-}
-
-#[derive(Debug, Copy, Clone, EguiProbe)]
+#[derive(Debug, Clone, EguiProbe)]
 pub struct RenderOptions {
     radians_options: RadiansOptions,
     radians_old_enabled: bool,
     jfa_passes_count: u32,
-    show: TextureOption,
+    show: String,
 }
 
 impl Default for RenderOptions {
@@ -59,7 +73,7 @@ impl Default for RenderOptions {
             radians_options: Default::default(),
             jfa_passes_count: 9,
             radians_old_enabled: true,
-            show: TextureOption::RadiansCascadesOld,
+            show: "RadiansCascadesOld".into(),
         }
     }
 }
@@ -72,12 +86,7 @@ pub struct RenderPassManager {
     show_pass: ShowRenderPass,
     quad_render_pass: QuadVertexRenderPass,
     render_options: RenderOptions,
-    scene_texture: SceneTexture,
-    texture1: TextureView,
-    texture2: TextureView,
-    distant_field_texture: TextureView,
-
-    radians_cascades_old: TextureView,
+    texture_manager: TextureManager,
 }
 
 impl RenderPassManager {
@@ -87,124 +96,70 @@ impl RenderPassManager {
         width: u32,
         height: u32,
     ) -> RenderPassManager {
+        let mut texture_manager = TextureManager::new(device);
         let quad_render_pass = QuadVertexRenderPass::new(device);
-        let jfa_pass = JfaRenderPass::new(device, config, width, height, &quad_render_pass);
-        let seed_pass = SeedRenderPass::new(device, config, width, height, &quad_render_pass);
-        let show_pass = ShowRenderPass::new(device, config, width, height, &quad_render_pass);
-        let distant_field_pass =
-            DistantFieldPass::new(device, config, width, height, &quad_render_pass);
-        let scene_texture = SceneTexture::new(width, height, device);
-        let radiance_old_pass = RadianceRenderOLDPass::new(
+        let jfa_pass = JfaRenderPass::new(
             device,
-            config,
             width,
             height,
             &quad_render_pass,
-            &scene_texture,
+            &mut texture_manager,
         );
-        let (texture1, texture2, radians_cascades_old, distant_field_texture) = (
-            create_texture(device, width, height),
-            create_texture(device, width, height),
-            create_texture(device, width, height),
-            create_texture(device, width, height),
+        let seed_pass = SeedRenderPass::new(device, &texture_manager, &quad_render_pass);
+        let show_pass = ShowRenderPass::new(device, config, &quad_render_pass);
+        let distant_field_pass = DistantFieldPass::new(
+            device,
+            &quad_render_pass,
+            width,
+            height,
+            &mut texture_manager,
         );
+
+        let radiance_old_pass =
+            RadianceRenderOLDPass::new(device, width, height, &quad_render_pass, &texture_manager);
+
         Self {
             jfa_pass,
             radiance_old_pass,
             quad_render_pass,
             render_options: Default::default(),
-            scene_texture,
-            texture1,
-            texture2,
-            radians_cascades_old,
             seed_pass,
             show_pass,
             distant_field_pass,
-            distant_field_texture,
+            texture_manager,
         }
     }
 
     pub fn resize(&mut self, width: u32, height: u32, device: &Device, queue: &Queue) {
-        self.scene_texture.resize(width, height, device);
-        self.jfa_pass.resize(width, height, queue);
-        self.radiance_old_pass
-            .resize(width, height, device, queue, &self.scene_texture);
-        (
-            self.texture1,
-            self.texture2,
-            self.radians_cascades_old,
-            self.distant_field_texture,
-        ) = (
-            create_texture(device, width, height),
-            create_texture(device, width, height),
-            create_texture(device, width, height),
-            create_texture(device, width, height),
-        )
+        self.texture_manager.resize(device, (width, height));
+        self.jfa_pass.resize(width, height);
+        self.radiance_old_pass.resize(width, height);
     }
 
-    pub fn render(
-        &mut self,
-        view: &TextureView,
-        encoder: &mut CommandEncoder,
-        device: &Device,
-        queue: &Queue,
-    ) {
-        let passes = self.render_options.jfa_passes_count;
-        self.seed_pass.render(
-            encoder,
-            device,
-            self.scene_texture.view(),
-            &self.texture1,
-            &self.quad_render_pass,
-        );
-        for i in 0..passes {
-            let (texture1, texture2) = if i % 2 == 0 {
-                (&self.texture1, &self.texture2)
-            } else {
-                (&self.texture2, &self.texture1)
-            };
-            self.jfa_pass.render(
-                encoder,
-                device,
-                queue,
-                texture1,
-                texture2,
-                2.0f32.powi((passes - i - 1) as i32),
-                &self.quad_render_pass,
-            );
-        }
+    pub fn render(&mut self, view: &TextureView, encoder: &mut CommandEncoder, device: &Device) {
+        self.seed_pass
+            .render(encoder, &self.texture_manager, &self.quad_render_pass);
+        self.jfa_pass
+            .multi_render(encoder, &self.quad_render_pass, &self.texture_manager);
         self.distant_field_pass.render(
             encoder,
             device,
-            &self.texture2,
-            &self.distant_field_texture,
+            &self.texture_manager,
             &self.quad_render_pass,
         );
 
         if self.render_options.radians_old_enabled {
             self.radiance_old_pass.render(
                 encoder,
-                device,
-                queue,
-                &self.radians_cascades_old,
                 self.render_options.radians_options,
+                &self.texture_manager,
                 &self.quad_render_pass,
             );
         }
-        let target_texture = match self.render_options.show {
-            TextureOption::Texture1 => &self.texture1,
-            TextureOption::Texture2 => &self.texture2,
-            TextureOption::RadiansCascadesOld => &self.radians_cascades_old,
-            TextureOption::SceneTexture => &self.scene_texture.view(),
-            TextureOption::DistanceField => &self.distant_field_texture,
-        };
-        self.show_pass.render(
-            encoder,
-            device,
-            target_texture,
-            view,
-            &self.quad_render_pass,
-        );
+        if let Some(texture) = self.texture_manager.get_texture(&self.render_options.show) {
+            self.show_pass
+                .render(encoder, texture.bind_group(), view, &self.quad_render_pass);
+        }
     }
 
     pub fn get_options(&mut self) -> &mut RenderOptions {
@@ -220,7 +175,10 @@ impl RenderPassManager {
         height: u32,
         queue: &Queue,
     ) {
-        self.scene_texture
-            .paint(pos, color, brush_radius, width, height, queue);
+        if let Some(ManagedTexture::SceneTexture(texture)) =
+            self.texture_manager.get_texture_mut("SceneTexture")
+        {
+            texture.paint(pos, color, brush_radius, width, height, queue);
+        }
     }
 }

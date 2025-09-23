@@ -1,127 +1,50 @@
+use bytemuck::{Pod, Zeroable, bytes_of};
 use glam::Vec2;
 use log::info;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindingResource, Buffer, BufferUsages,
-    CommandEncoder, Device, Queue, TextureView,
-    util::{BufferInitDescriptor, DeviceExt},
+    BindGroup, Buffer, BufferUsages, CommandEncoder, Device, PushConstantRange, Queue,
+    ShaderStages, TextureView,
+    util::{BufferInitDescriptor, DeviceExt, RenderEncoder},
 };
 
-use crate::render_passes::quad_vertex::QuadVertexRenderPass;
-use crate::vertex_state_for_quad;
+use crate::{
+    render_passes::quad_vertex::QuadVertexRenderPass,
+    texture_manager::{self, TextureManager},
+    vertex_state_for_quad,
+};
 
-fn create_buffers(device: &Device, width: u32, height: u32) -> (Buffer, Buffer) {
-    let one_over_size = Vec2::new(1.0 / width as f32, 1.0 / height as f32);
-    let one_over_size_buffer = device.create_buffer_init(&BufferInitDescriptor {
-        label: Some("One Over Size Buffer"),
-        contents: bytemuck::bytes_of(&one_over_size),
-        usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-    });
-
-    let u_offset_buffer = device.create_buffer_init(&BufferInitDescriptor {
-        label: Some("Offset Buffer"),
-        contents: bytemuck::bytes_of(&1.0f32), // начальное смещение
-        usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-    });
-
-    (one_over_size_buffer, u_offset_buffer)
+#[repr(C)]
+#[derive(PartialEq, Debug, Clone, Copy, Zeroable, Pod)]
+struct JfaConstants {
+    one_over_size: Vec2,
+    u_offset: f32,
 }
 
 pub struct JfaRenderPass {
     render_pipeline: wgpu::RenderPipeline,
-    one_over_size_buffer: Buffer,
-    u_offset_buffer: Buffer,
-    skip_buffer: Buffer,
-    sampler: wgpu::Sampler,
-    bind_group_layout: wgpu::BindGroupLayout,
+    texture1: usize,
+    texture2: usize,
+    width: u32,
+    height: u32,
 }
 
 impl JfaRenderPass {
     pub fn new(
         device: &Device,
-        config: &wgpu::SurfaceConfiguration,
         width: u32,
         height: u32,
         quad_render_pass: &QuadVertexRenderPass,
+        texture_manager: &mut TextureManager,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::include_wgsl!("./shaders/jfa.wgsl"));
 
-        let (one_over_size_buffer, u_offset_buffer) = create_buffers(device, width, height);
-
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
-        let skip_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("Skip Buffer"),
-            contents: bytemuck::bytes_of(&0.0f32), // изначально skip = 0.0 (false)
-            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-        });
-
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("JFA Bind Group Layout"),
-            entries: &[
-                // sampler
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-                // texture
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                // one_over_size
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                // u_offset
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 4,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-        });
-
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("JFA Pipeline Layout"),
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[&texture_manager.get_bind_group_layout()],
+            push_constant_ranges: &[PushConstantRange {
+                stages: ShaderStages::FRAGMENT,
+                range: 0..std::mem::size_of::<JfaConstants>() as u32,
+            }],
         });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -157,71 +80,40 @@ impl JfaRenderPass {
             cache: None,
         });
 
+        let texture1 = texture_manager.create_texture(
+            "JfaTexture1",
+            (width, height),
+            device,
+            texture_manager::TextureType::Standart,
+        );
+        let texture2 = texture_manager.create_texture(
+            "JfaTexture2",
+            (width, height),
+            device,
+            texture_manager::TextureType::Standart,
+        );
         JfaRenderPass {
             render_pipeline,
-            one_over_size_buffer,
-            u_offset_buffer,
-            sampler,
-            skip_buffer,
-            bind_group_layout,
+            texture1,
+            texture2,
+            width,
+            height,
         }
     }
 
-    pub fn resize(&mut self, width: u32, height: u32, queue: &Queue) {
-        let one_over_size = Vec2::new(1.0 / width as f32, 1.0 / height as f32);
-
-        queue.write_buffer(
-            &self.one_over_size_buffer,
-            0,
-            bytemuck::bytes_of(&one_over_size),
-        );
-        info!("JFA resized");
-    }
-
-    pub fn set_skip(&self, queue: &Queue, skip: bool) {
-        let val: f32 = if skip { 1.0 } else { 0.0 };
-        queue.write_buffer(&self.skip_buffer, 0, bytemuck::bytes_of(&val));
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.width = width;
+        self.height = height;
     }
 
     pub fn render(
         &mut self,
         encoder: &mut CommandEncoder,
-        device: &Device,
-        queue: &Queue,
-        input_texture: &TextureView,
+        input_texture_bind_group: &BindGroup,
         output_view: &TextureView,
         offset: f32,
         quad_render_pass: &QuadVertexRenderPass,
     ) {
-        queue.write_buffer(&self.u_offset_buffer, 0, bytemuck::bytes_of(&offset));
-
-        let bind_group = device.create_bind_group(&BindGroupDescriptor {
-            label: Some("JFA Bind Group (per-frame)"),
-            layout: &self.bind_group_layout,
-            entries: &[
-                BindGroupEntry {
-                    binding: 0,
-                    resource: BindingResource::Sampler(&self.sampler),
-                },
-                BindGroupEntry {
-                    binding: 1,
-                    resource: BindingResource::TextureView(input_texture),
-                },
-                BindGroupEntry {
-                    binding: 2,
-                    resource: self.one_over_size_buffer.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 3,
-                    resource: self.u_offset_buffer.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 4,
-                    resource: self.skip_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("JFA Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -238,7 +130,53 @@ impl JfaRenderPass {
         });
 
         render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.set_bind_group(0, &bind_group, &[]);
+        render_pass.set_push_constants(
+            ShaderStages::FRAGMENT,
+            0,
+            bytes_of(&JfaConstants {
+                one_over_size: Vec2::new(1.0 / self.width as f32, 1.0 / self.height as f32),
+                u_offset: offset,
+            }),
+        );
+        render_pass.set_bind_group(0, input_texture_bind_group, &[]);
         quad_render_pass.render(&mut render_pass);
+    }
+
+    pub fn multi_render(
+        &mut self,
+        encoder: &mut CommandEncoder,
+        quad_render_pass: &QuadVertexRenderPass,
+        texture_manager: &TextureManager,
+    ) {
+        let passes = 9;
+        let (texture1, texture2) = (
+            texture_manager.get_texture_by_index(self.texture1).unwrap(),
+            texture_manager.get_texture_by_index(self.texture2).unwrap(),
+        );
+        self.render(
+            encoder,
+            &texture_manager
+                .get_texture("SceneTexture")
+                .unwrap()
+                .bind_group(),
+            &texture1.view(),
+            2.0f32.powi((passes - 1) as i32),
+            &quad_render_pass,
+        );
+        for i in 0..passes {
+            let (texture1, texture2) = if i % 2 == 0 {
+                (texture1, texture2)
+            } else {
+                (texture2, texture1)
+            };
+
+            self.render(
+                encoder,
+                &texture1.bind_group(),
+                &texture2.view(),
+                2.0f32.powi((passes - i - 1) as i32),
+                &quad_render_pass,
+            );
+        }
     }
 }
