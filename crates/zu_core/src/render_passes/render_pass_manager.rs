@@ -17,48 +17,6 @@ use crate::{
     texture_manager::{self, ManagedTexture, TextureManager},
 };
 
-fn create_texture(
-    device: &Device,
-    width: u32,
-    height: u32,
-    texture_bind_group_layout: &BindGroupLayout,
-    sampler: &Sampler,
-) -> (TextureView, BindGroup) {
-    let texture_size = wgpu::Extent3d {
-        width,
-        height,
-        depth_or_array_layers: 1,
-    };
-    let texture = device.create_texture(&wgpu::TextureDescriptor {
-        size: texture_size,
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8UnormSrgb,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING
-            | wgpu::TextureUsages::COPY_DST
-            | wgpu::TextureUsages::RENDER_ATTACHMENT,
-        label: Some("diffuse_texture"),
-        view_formats: &[],
-    });
-    let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let texture_bind_group = device.create_bind_group(&BindGroupDescriptor {
-        label: Some("Texture Bind Group"),
-        layout: texture_bind_group_layout,
-        entries: &[
-            BindGroupEntry {
-                binding: 0,
-                resource: BindingResource::Sampler(&sampler),
-            },
-            BindGroupEntry {
-                binding: 1,
-                resource: BindingResource::TextureView(&texture_view),
-            },
-        ],
-    });
-    (texture_view, texture_bind_group)
-}
-
 #[derive(Debug, Clone, EguiProbe)]
 pub struct RenderOptions {
     radians_options: RadiansOptions,
@@ -97,6 +55,12 @@ impl RenderPassManager {
         height: u32,
     ) -> RenderPassManager {
         let mut texture_manager = TextureManager::new(device);
+        texture_manager.create_texture(
+            "SceneTexture",
+            (width, height),
+            device,
+            texture_manager::TextureType::SceneTexture,
+        );
         let quad_render_pass = QuadVertexRenderPass::new(device);
         let jfa_pass = JfaRenderPass::new(
             device,
@@ -115,8 +79,13 @@ impl RenderPassManager {
             &mut texture_manager,
         );
 
-        let radiance_old_pass =
-            RadianceRenderOLDPass::new(device, width, height, &quad_render_pass, &texture_manager);
+        let radiance_old_pass = RadianceRenderOLDPass::new(
+            device,
+            width,
+            height,
+            &quad_render_pass,
+            &mut texture_manager,
+        );
 
         Self {
             jfa_pass,

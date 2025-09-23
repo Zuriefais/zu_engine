@@ -28,6 +28,7 @@ pub struct RadianceRenderOLDPass {
     render_pipeline: wgpu::RenderPipeline,
     width: u32,
     height: u32,
+    radiance_texture: usize,
 }
 
 impl RadianceRenderOLDPass {
@@ -36,7 +37,7 @@ impl RadianceRenderOLDPass {
         width: u32,
         height: u32,
         quad_render_pass: &QuadVertexRenderPass,
-        texture_manager: &TextureManager,
+        texture_manager: &mut TextureManager,
     ) -> Self {
         let radiance_shader = device
             .create_shader_module(wgpu::include_wgsl!("./shaders/radiance_cascades_old.wgsl"));
@@ -88,11 +89,18 @@ impl RadianceRenderOLDPass {
             multiview: None, // 5.
             cache: None,     // 6.
         });
+        let radiance_texture = texture_manager.create_texture(
+            "RadiansCascadesOLD",
+            (width, height),
+            device,
+            texture_manager::TextureType::Standart,
+        ) as usize;
 
         RadianceRenderOLDPass {
             render_pipeline,
             width,
             height,
+            radiance_texture,
         }
     }
 
@@ -114,7 +122,7 @@ impl RadianceRenderOLDPass {
                 // This is what @location(0) in the fragment shader targets
                 Some(wgpu::RenderPassColorAttachment {
                     view: texture_manager
-                        .get_texture("RadiansCascadesOLD")
+                        .get_texture_by_index(self.radiance_texture)
                         .unwrap()
                         .view(),
                     resolve_target: None,
@@ -149,7 +157,7 @@ impl RadianceRenderOLDPass {
         render_pass.set_bind_group(
             0,
             texture_manager
-                .get_texture("SceneTextures")
+                .get_texture("SceneTexture")
                 .unwrap()
                 .bind_group(),
             &[],

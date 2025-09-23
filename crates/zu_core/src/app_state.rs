@@ -9,6 +9,7 @@ use egui_wgpu::{ScreenDescriptor, wgpu};
 use glam::Vec2;
 use log::info;
 use std::sync::Arc;
+use wgpu::Limits;
 
 use winit::event::WindowEvent;
 
@@ -60,13 +61,20 @@ impl AppState {
             })
             .await
             .expect("Unable request adapter");
+        info!(
+            "Adapter features: {:#}, limits: {:#?}",
+            adapter.features(),
+            adapter.limits()
+        );
 
         let features = wgpu::Features::PUSH_CONSTANTS;
+        let mut limits = Limits::default();
+        limits.max_push_constant_size = 128;
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: None,
                 required_features: features,
-                required_limits: Default::default(),
+                required_limits: limits,
                 memory_hints: Default::default(),
                 trace: wgpu::Trace::Off,
             })
