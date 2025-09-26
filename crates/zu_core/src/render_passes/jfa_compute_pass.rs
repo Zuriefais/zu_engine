@@ -18,8 +18,10 @@ use crate::{
 struct JfaConstants {
     one_over_size: Vec2,
     u_offset: f32,
+    _pad0: f32,
     texture_size: Vec2,
     passes: i32,
+    _pad1: i32,
 }
 
 pub struct JfaComputePass {
@@ -54,7 +56,7 @@ impl JfaComputePass {
             label: Some("Jfa compute pass"),
             layout: Some(&pipeline_layout),
             module: &shader,
-            entry_point: None,
+            entry_point: Some("fs_main"),
             compilation_options: Default::default(),
             cache: Default::default(),
         });
@@ -97,6 +99,8 @@ impl JfaComputePass {
                 u_offset: 2.0f32.powi((passes - 1) as i32),
                 texture_size: Vec2::new(self.width as f32, self.height as f32),
                 passes: passes as i32,
+                _pad1: 0,
+                _pad0: 0.0,
             }),
         );
         compute_pass.set_bind_group(
@@ -115,6 +119,8 @@ impl JfaComputePass {
                 .compute_mut_group(),
             &[],
         );
-        compute_pass.dispatch_workgroups(self.width, self.height, 1);
+        let wg_x = (self.width + 7) / 8;
+        let wg_y = (self.height + 7) / 8;
+        compute_pass.dispatch_workgroups(wg_x, wg_y, 1);
     }
 }

@@ -15,8 +15,10 @@ var<push_constant> constants: PushConstants;
 fn fs_main(@builtin(global_invocation_id) id: vec3<u32>) {
     let pixelCoord = id.xy;
     let uv = (vec2<f32>(pixelCoord) + 0.5) / constants.texture_size;
+
     var alpha = textureLoad(scene_texture, pixelCoord, 0).a;
     textureStore(output_texture, vec2<i32>(pixelCoord), vec4(uv * alpha, 0.0, 1.0));
+    //workgroupBarrier();
     for (var pass_i = 0; pass_i <= constants.passes; pass_i += 1) {
         var nearestSeed = vec4(-2.0);
         var nearestDist = 999999.9;
@@ -40,5 +42,6 @@ fn fs_main(@builtin(global_invocation_id) id: vec3<u32>) {
             }
         }
         textureStore(output_texture, vec2<i32>(pixelCoord), nearestSeed);
+        //workgroupBarrier();
     }
 }
