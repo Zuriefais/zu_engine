@@ -35,7 +35,7 @@ impl SeedRenderPass {
                 module: &shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                    format: wgpu::TextureFormat::Rgba8Unorm,
                     blend: Some(wgpu::BlendState::REPLACE),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -72,7 +72,7 @@ impl SeedRenderPass {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Seed  Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: texture_manager.get_texture("JfaTexture1").unwrap().view(),
+                view: texture_manager.get_texture("JfaTexture").unwrap().view(),
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),

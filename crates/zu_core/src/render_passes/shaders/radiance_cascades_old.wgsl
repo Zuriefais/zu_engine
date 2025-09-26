@@ -38,7 +38,6 @@ fn raymarch(light: vec4<f32>, uv: vec2<f32>) -> vec4<f32> {
     var one_over_ray_count: f32 = 1.0 / f32(constants.ray_count);
     var tau_over_ray_count: f32 = TAU * one_over_ray_count;
 
-    // Distinct random value for every pixel
     var noise: f32 = select(0.1, rand22(uv), bool(constants.enable_noise));
     var radiance = vec4(0.0);
 
@@ -49,7 +48,6 @@ fn raymarch(light: vec4<f32>, uv: vec2<f32>) -> vec4<f32> {
 
         let initial_step: i32 = select(max(0, constants.max_steps - 1), 0, bool(constants.accum_radiance));
         for (var step = initial_step; step < constants.max_steps; step++) {
-              // Go the direction we're traveling (with noise)
             var sampleUv = uv + rayDirectionUv * f32(step);
 
             if sampleUv.x < 0.0 || sampleUv.x > 1.0 || sampleUv.y < 0.0 || sampleUv.y > 1.0 {

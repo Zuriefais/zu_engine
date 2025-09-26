@@ -1,4 +1,5 @@
 pub mod distant_field_pass;
+pub mod jfa_compute_pass;
 pub mod jfa_pass;
 pub mod object_render_pass;
 pub mod quad_vertex;

@@ -8,6 +8,7 @@ use wgpu::{
 use crate::{
     render_passes::{
         distant_field_pass::{self, DistantFieldPass},
+        jfa_compute_pass::JfaComputePass,
         jfa_pass::{self, JfaRenderPass},
         quad_vertex::QuadVertexRenderPass,
         radiance_render::{self, RadianceRenderPass, RadiansOptions},
@@ -24,6 +25,7 @@ pub struct RenderOptions {
     radians_options_old: RadiansOptionsOLD,
     radians_old_enabled: bool,
     jfa_passes_count: u32,
+    jfa_compute_or_fragment: bool,
     show: String,
 }
 
@@ -35,12 +37,14 @@ impl Default for RenderOptions {
             jfa_passes_count: 9,
             radians_old_enabled: false,
             show: "RadiansCascades".into(),
+            jfa_compute_or_fragment: false,
         }
     }
 }
 
 pub struct RenderPassManager {
     jfa_pass: JfaRenderPass,
+    jfa_compute_pass: JfaComputePass,
     seed_pass: SeedRenderPass,
     radiance_old_pass: RadianceRenderOLDPass,
     radiance_pass: RadianceRenderPass,
@@ -64,6 +68,7 @@ impl RenderPassManager {
             (width, height),
             device,
             texture_manager::TextureType::SceneTexture,
+            1.0,
         );
         let quad_render_pass = QuadVertexRenderPass::new(device);
         let jfa_pass = JfaRenderPass::new(
@@ -73,6 +78,7 @@ impl RenderPassManager {
             &quad_render_pass,
             &mut texture_manager,
         );
+        let jfa_compute_pass = JfaComputePass::new(device, width, height, &mut texture_manager);
         let seed_pass = SeedRenderPass::new(device, &texture_manager, &quad_render_pass);
         let show_pass = ShowRenderPass::new(device, config, &quad_render_pass);
         let distant_field_pass = DistantFieldPass::new(
@@ -109,24 +115,34 @@ impl RenderPassManager {
             show_pass,
             distant_field_pass,
             texture_manager,
+            jfa_compute_pass,
         }
     }
 
     pub fn resize(&mut self, width: u32, height: u32, device: &Device, queue: &Queue) {
         self.texture_manager.resize(device, (width, height));
         self.jfa_pass.resize(width, height);
+        self.jfa_compute_pass.resize(width, height);
         self.radiance_old_pass.resize(width, height);
     }
 
     pub fn render(&mut self, view: &TextureView, encoder: &mut CommandEncoder, device: &Device) {
-        self.seed_pass
-            .render(encoder, &self.texture_manager, &self.quad_render_pass);
-        self.jfa_pass.multi_render(
-            encoder,
-            &self.quad_render_pass,
-            &self.texture_manager,
-            self.render_options.jfa_passes_count as i32,
-        );
+        if !self.render_options.jfa_compute_or_fragment {
+            self.jfa_compute_pass.render(
+                encoder,
+                &self.texture_manager,
+                self.render_options.jfa_passes_count,
+            );
+        } else {
+            self.seed_pass
+                .render(encoder, &self.texture_manager, &self.quad_render_pass);
+            self.jfa_pass.multi_render(
+                encoder,
+                &self.quad_render_pass,
+                &self.texture_manager,
+                self.render_options.jfa_passes_count as i32,
+            );
+        }
         self.distant_field_pass.render(
             encoder,
             device,
@@ -134,20 +150,21 @@ impl RenderPassManager {
             &self.quad_render_pass,
         );
 
-        if self.render_options.radians_old_enabled {
-            self.radiance_old_pass.render(
-                encoder,
-                self.render_options.radians_options_old,
-                &self.texture_manager,
-                &self.quad_render_pass,
-            );
-        }
-        self.radiance_pass.render(
-            encoder,
-            self.render_options.radians_options,
-            &self.texture_manager,
-            &self.quad_render_pass,
-        );
+        // if self.render_options.radians_old_enabled {
+        //     self.radiance_old_pass.render(
+        //         encoder,
+        //         self.render_options.radians_options_old,
+        //         &self.texture_manager,
+        //         &self.quad_render_pass,
+        //     );
+        // }
+        // self.radiance_pass.render(
+        //     encoder,
+        //     self.render_options.radians_options,
+        //     &self.texture_manager,
+        //     &self.quad_render_pass,
+        //     1,
+        // );
         if let Some(texture) = self.texture_manager.get_texture(&self.render_options.show) {
             self.show_pass
                 .render(encoder, texture.bind_group(), view, &self.quad_render_pass);

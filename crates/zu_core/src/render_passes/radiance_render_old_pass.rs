@@ -61,7 +61,7 @@ impl RadianceRenderOLDPass {
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     // 4.
-                    format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                    format: wgpu::TextureFormat::Rgba8Unorm,
                     blend: Some(wgpu::BlendState::REPLACE),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -93,6 +93,7 @@ impl RadianceRenderOLDPass {
             (width, height),
             device,
             texture_manager::TextureType::Standart,
+            1.0,
         ) as usize;
 
         RadianceRenderOLDPass {

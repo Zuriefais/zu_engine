@@ -55,7 +55,7 @@ impl AppState {
         // let _ = window.request_inner_size(PhysicalSize::new(width, height));
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::default(),
+                power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
             })
@@ -67,7 +67,8 @@ impl AppState {
             adapter.limits()
         );
 
-        let features = wgpu::Features::PUSH_CONSTANTS;
+        let features = wgpu::Features::PUSH_CONSTANTS
+            | wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES;
         let mut limits = Limits::default();
         limits.max_push_constant_size = 128;
         let (device, queue) = adapter

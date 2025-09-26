@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 use log::info;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, Device, Queue, Sampler,
-    Texture, TextureView,
+    Texture, TextureFormat, TextureView,
 };
 
 pub enum TextureType {
@@ -27,6 +27,24 @@ impl ManagedTexture {
         match self {
             ManagedTexture::Standart(engine_texture) => &engine_texture.bind_group,
             ManagedTexture::SceneTexture(scene_texture) => &scene_texture.texture.bind_group,
+        }
+    }
+
+    pub fn compute_bind_group(&self) -> &BindGroup {
+        match self {
+            ManagedTexture::Standart(engine_texture) => &engine_texture.compute_bind_group,
+            ManagedTexture::SceneTexture(scene_texture) => {
+                &scene_texture.texture.compute_bind_group
+            }
+        }
+    }
+
+    pub fn compute_mut_group(&self) -> &BindGroup {
+        match self {
+            ManagedTexture::Standart(engine_texture) => &engine_texture.compute_mut_bind_group,
+            ManagedTexture::SceneTexture(scene_texture) => {
+                &scene_texture.texture.compute_mut_bind_group
+            }
         }
     }
 }
@@ -53,6 +71,9 @@ pub struct EngineTexture {
     pub texture: Texture,
     pub view: TextureView,
     pub bind_group: BindGroup,
+    pub compute_bind_group: BindGroup,
+    pub compute_mut_bind_group: BindGroup,
+    pub resolution_scale: f32,
 }
 
 impl EngineTexture {
@@ -61,11 +82,14 @@ impl EngineTexture {
         resolution: (u32, u32),
         device: &Device,
         bind_group_layout: &BindGroupLayout,
+        compute_texture_bind_group_layout: &BindGroupLayout,
+        compute_mut_texture_bind_group_layout: &BindGroupLayout,
         sampler: &Sampler,
+        resolution_scale: f32,
     ) -> Self {
         let texture_size = wgpu::Extent3d {
-            width: resolution.0,
-            height: resolution.1,
+            width: (resolution.0 as f32 * resolution_scale) as u32,
+            height: (resolution.1 as f32 * resolution_scale) as u32,
             depth_or_array_layers: 1,
         };
         let texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -73,10 +97,11 @@ impl EngineTexture {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            format: wgpu::TextureFormat::Rgba8Unorm,
             usage: wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::COPY_DST
-                | wgpu::TextureUsages::RENDER_ATTACHMENT,
+                | wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::STORAGE_BINDING,
             label: Some(name),
             view_formats: &[],
         });
@@ -95,10 +120,29 @@ impl EngineTexture {
                 },
             ],
         });
+        let compute_bind_group = device.create_bind_group(&BindGroupDescriptor {
+            label: Some("Compute texture Bind Group"),
+            layout: compute_texture_bind_group_layout,
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&view),
+            }],
+        });
+        let compute_mut_bind_group = device.create_bind_group(&BindGroupDescriptor {
+            label: Some("Compute mut texture Bind Group"),
+            layout: compute_mut_texture_bind_group_layout,
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&view),
+            }],
+        });
         Self {
             view,
             bind_group,
+            compute_bind_group,
+            compute_mut_bind_group,
             texture,
+            resolution_scale,
         }
     }
 }
@@ -114,9 +158,21 @@ impl SceneTexture {
         resolution: (u32, u32),
         device: &Device,
         bind_group_layout: &BindGroupLayout,
+        compute_texture_bind_group_layout: &BindGroupLayout,
+        compute_mut_texture_bind_group_layout: &BindGroupLayout,
         sampler: &Sampler,
+        resolution_scale: f32,
     ) -> Self {
-        let texture = EngineTexture::new(name, resolution, device, bind_group_layout, sampler);
+        let texture = EngineTexture::new(
+            name,
+            resolution,
+            device,
+            bind_group_layout,
+            compute_texture_bind_group_layout,
+            compute_mut_texture_bind_group_layout,
+            sampler,
+            resolution_scale,
+        );
         let pixel_count = (resolution.0 * resolution.1) as usize;
         let flat_rgba: Vec<u8> = vec![[0u8, 0u8, 0u8, 0u8]; pixel_count]
             .into_iter()
@@ -157,7 +213,7 @@ impl SceneTexture {
             (color[0] * 255.0) as u8,
             (color[1] * 255.0) as u8,
             (color[2] * 255.0) as u8,
-            255,
+            (color[3] * 255.0) as u8,
         ];
 
         let center_x = pos.x as i32;
@@ -234,6 +290,8 @@ impl SceneTexture {
 pub struct TextureManager {
     textures: IndexMap<String, ManagedTexture>,
     texture_bind_group_layout: BindGroupLayout,
+    compute_texture_bind_group_layout: BindGroupLayout,
+    compute_mut_texture_bind_group_layout: BindGroupLayout,
     sampler: Sampler,
     num: usize,
 }
@@ -267,6 +325,39 @@ impl TextureManager {
                     ],
                 },
             ),
+            compute_texture_bind_group_layout: device.create_bind_group_layout(
+                &wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Compute texture Bind Group Layout"),
+                    entries: &[wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    }],
+                },
+            ),
+            compute_mut_texture_bind_group_layout: device.create_bind_group_layout(
+                &wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Compute mut texture Bind Group Layout"),
+                    entries: &[
+                        // texture
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::COMPUTE,
+                            ty: wgpu::BindingType::StorageTexture {
+                                access: wgpu::StorageTextureAccess::ReadWrite,
+                                format: TextureFormat::Rgba8Unorm,
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                            },
+                            count: None,
+                        },
+                    ],
+                },
+            ),
             sampler: device.create_sampler(&wgpu::SamplerDescriptor {
                 address_mode_u: wgpu::AddressMode::ClampToEdge,
                 address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -286,6 +377,7 @@ impl TextureManager {
         resolution: (u32, u32),
         device: &Device,
         texture_type: TextureType,
+        resolution_scale: f32,
     ) -> usize {
         match texture_type {
             TextureType::Standart => {
@@ -296,7 +388,10 @@ impl TextureManager {
                         resolution,
                         device,
                         &self.texture_bind_group_layout,
+                        &self.compute_texture_bind_group_layout,
+                        &self.compute_mut_texture_bind_group_layout,
                         &self.sampler,
+                        resolution_scale,
                     )),
                 );
             }
@@ -308,7 +403,10 @@ impl TextureManager {
                         resolution,
                         device,
                         &self.texture_bind_group_layout,
+                        &self.compute_texture_bind_group_layout,
+                        &self.compute_mut_texture_bind_group_layout,
                         &self.sampler,
+                        resolution_scale,
                     )),
                 );
             }
@@ -343,7 +441,10 @@ impl TextureManager {
                         resolution,
                         device,
                         &self.texture_bind_group_layout,
+                        &self.compute_texture_bind_group_layout,
+                        &self.compute_mut_texture_bind_group_layout,
                         &self.sampler,
+                        engine_texture.resolution_scale,
                     )
                 }
                 ManagedTexture::SceneTexture(scene_texture) => {
@@ -352,7 +453,10 @@ impl TextureManager {
                         resolution,
                         device,
                         &self.texture_bind_group_layout,
+                        &self.compute_texture_bind_group_layout,
+                        &self.compute_mut_texture_bind_group_layout,
                         &self.sampler,
+                        scene_texture.texture.resolution_scale,
                     )
                 }
             }
@@ -361,6 +465,14 @@ impl TextureManager {
 
     pub fn get_bind_group_layout(&self) -> &BindGroupLayout {
         &self.texture_bind_group_layout
+    }
+
+    pub fn get_compute_bind_group_layout(&self) -> &BindGroupLayout {
+        &self.compute_texture_bind_group_layout
+    }
+
+    pub fn get_compute_mut_bind_group_layout(&self) -> &BindGroupLayout {
+        &self.compute_mut_texture_bind_group_layout
     }
 }
 

@@ -55,7 +55,7 @@ impl JfaRenderPass {
                 module: &shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                    format: wgpu::TextureFormat::Rgba8Unorm,
                     blend: Some(wgpu::BlendState::REPLACE),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -81,16 +81,18 @@ impl JfaRenderPass {
         });
 
         let texture1 = texture_manager.create_texture(
-            "JfaTexture1",
+            "JfaTexture",
             (width, height),
             device,
             texture_manager::TextureType::Standart,
+            1.0,
         );
         let texture2 = texture_manager.create_texture(
             "JfaTexture2",
             (width, height),
             device,
             texture_manager::TextureType::Standart,
+            1.0,
         );
         JfaRenderPass {
             render_pipeline,
