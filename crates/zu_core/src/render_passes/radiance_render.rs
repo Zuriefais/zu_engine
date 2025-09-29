@@ -126,7 +126,7 @@ impl RadianceRenderPass {
                 // This is what @location(0) in the fragment shader targets
                 Some(wgpu::RenderPassColorAttachment {
                     view: texture_manager
-                        .get_texture_by_index(self.radiance_texture)
+                        .get_texture("RadiansCascades")
                         .unwrap()
                         .view(),
                     resolve_target: None,

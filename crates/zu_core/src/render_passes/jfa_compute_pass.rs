@@ -14,14 +14,12 @@ use crate::{
 };
 
 #[repr(C)]
-#[derive(PartialEq, Debug, Clone, Copy, Zeroable, Pod)]
-struct JfaConstants {
-    one_over_size: Vec2,
-    u_offset: f32,
-    _pad0: f32,
-    texture_size: Vec2,
-    passes: i32,
-    _pad1: i32,
+#[derive(Debug, Copy, Clone, Zeroable, Pod)]
+pub struct JfaConstants {
+    pub one_over_size: [f32; 2],
+    pub texture_size: [f32; 2],
+    pub passes: i32,
+    pub _pad: i32,
 }
 
 pub struct JfaComputePass {
@@ -95,12 +93,10 @@ impl JfaComputePass {
         compute_pass.set_push_constants(
             0,
             bytes_of(&JfaConstants {
-                one_over_size: Vec2::new(1.0 / self.width as f32, 1.0 / self.height as f32),
-                u_offset: 2.0f32.powi((passes - 1) as i32),
-                texture_size: Vec2::new(self.width as f32, self.height as f32),
+                one_over_size: [1.0 / self.width as f32, 1.0 / self.height as f32],
+                texture_size: [self.width as f32, self.height as f32],
                 passes: passes as i32,
-                _pad1: 0,
-                _pad0: 0.0,
+                _pad: 0,
             }),
         );
         compute_pass.set_bind_group(

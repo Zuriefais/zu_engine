@@ -9,7 +9,7 @@ use egui_wgpu::{ScreenDescriptor, wgpu};
 use glam::Vec2;
 use log::info;
 use std::sync::Arc;
-use wgpu::Limits;
+use wgpu::{Instance, Limits, PresentMode};
 
 use winit::event::WindowEvent;
 
@@ -32,6 +32,9 @@ pub struct AppState {
     mouse_pos: Vec2,
     brush_radius: u32,
     render_pass_manager: RenderPassManager,
+    present_mode: PresentMode,
+    vsync_enabled: bool,
+    instance: Instance,
 }
 
 impl AppState {
@@ -149,6 +152,9 @@ impl AppState {
             color: [1.0, 1.0, 1.0, 1.0],
             mouse_pos: Vec2::ZERO,
             brush_radius: 10,
+            present_mode: wgpu::PresentMode::AutoVsync,
+            vsync_enabled: true,
+            instance,
         })
     }
 
@@ -162,8 +168,28 @@ impl AppState {
             .resize(width, height, &self.device, &self.queue);
     }
 
+    pub fn set_vsync_enabled(&mut self, enabled: bool) {
+        let new_present_mode = if enabled {
+            // Use AutoVsync for V-sync enabled (usually tries to sync with display refresh rate)
+            wgpu::PresentMode::AutoVsync
+        } else {
+            // Use AutoNoVsync for V-sync disabled (allows rendering frames as fast as possible)
+            wgpu::PresentMode::AutoNoVsync
+        };
+
+        if self.present_mode != new_present_mode {
+            self.present_mode = new_present_mode;
+            self.surface_config.present_mode = new_present_mode;
+            self.surface = self
+                .instance
+                .create_surface(self.window.clone())
+                .expect("Failed to create surface!");
+            self.surface.configure(&self.device, &self.surface_config);
+            log::info!("V-sync changed to: {:?}", new_present_mode);
+        }
+    }
+
     pub fn handle_redraw(&mut self) {
-        let window = &self.window;
         let width = self.surface_config.width;
         let height = self.surface_config.height;
 
@@ -180,7 +206,7 @@ impl AppState {
 
         let screen_descriptor = ScreenDescriptor {
             size_in_pixels: [width, height],
-            pixels_per_point: window.scale_factor() as f32 * self.scale_factor,
+            pixels_per_point: self.window.scale_factor() as f32 * self.scale_factor,
         };
 
         let surface_texture = self.surface.get_current_texture();
@@ -207,26 +233,31 @@ impl AppState {
         self.render_pass_manager
             .render(&surface_view, &mut encoder, &self.device);
 
-        self.egui_renderer.begin_frame(window);
+        self.egui_renderer.begin_frame(&self.window);
+        let vsync_enabled = self.vsync_enabled;
         self.engine_gui.render_gui(
             &mut self.color,
             &mut self.paint,
             &mut self.mouse_pos,
             &mut self.brush_radius,
             self.render_pass_manager.get_options(),
+            &mut self.vsync_enabled,
         );
+        if vsync_enabled != self.vsync_enabled {
+            self.set_vsync_enabled(self.vsync_enabled);
+        }
         self.egui_renderer.end_frame_and_draw(
             &self.device,
             &self.queue,
             &mut encoder,
-            window,
+            &self.window,
             &surface_view,
             screen_descriptor,
         );
 
         self.queue.submit(Some(encoder.finish()));
         surface_texture.present();
-        window.request_redraw();
+        self.window.request_redraw();
     }
 
     pub fn event(&mut self, event: &WindowEvent) {

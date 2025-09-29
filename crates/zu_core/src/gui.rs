@@ -23,6 +23,7 @@ impl EngineGui {
         pointer_pos: &mut Vec2,
         brush_radius: &mut u32,
         render_options: &mut RenderOptions,
+        vsync_enabled: &mut bool,
     ) {
         *pointer_pos = {
             if let Some(pos) = self.egui_context.pointer_latest_pos() {
@@ -40,6 +41,7 @@ impl EngineGui {
             ui.add(egui::Slider::new(brush_radius, 0..=120).text("brush radius"));
             Probe::new(render_options).show(ui);
             UsageDiagnostics {}.ui(ui);
+            ui.checkbox(vsync_enabled, "Vsync enabled")
         });
     }
 }

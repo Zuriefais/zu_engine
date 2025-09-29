@@ -150,21 +150,20 @@ impl RenderPassManager {
             &self.quad_render_pass,
         );
 
-        // if self.render_options.radians_old_enabled {
-        //     self.radiance_old_pass.render(
-        //         encoder,
-        //         self.render_options.radians_options_old,
-        //         &self.texture_manager,
-        //         &self.quad_render_pass,
-        //     );
-        // }
-        // self.radiance_pass.render(
-        //     encoder,
-        //     self.render_options.radians_options,
-        //     &self.texture_manager,
-        //     &self.quad_render_pass,
-        //     1,
-        // );
+        if self.render_options.radians_old_enabled {
+            self.radiance_old_pass.render(
+                encoder,
+                self.render_options.radians_options_old,
+                &self.texture_manager,
+                &self.quad_render_pass,
+            );
+        }
+        self.radiance_pass.render(
+            encoder,
+            self.render_options.radians_options,
+            &self.texture_manager,
+            &self.quad_render_pass,
+        );
         if let Some(texture) = self.texture_manager.get_texture(&self.render_options.show) {
             self.show_pass
                 .render(encoder, texture.bind_group(), view, &self.quad_render_pass);
