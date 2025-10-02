@@ -170,20 +170,17 @@ impl AppState {
 
     pub fn set_vsync_enabled(&mut self, enabled: bool) {
         let new_present_mode = if enabled {
-            // Use AutoVsync for V-sync enabled (usually tries to sync with display refresh rate)
             wgpu::PresentMode::AutoVsync
         } else {
-            // Use AutoNoVsync for V-sync disabled (allows rendering frames as fast as possible)
             wgpu::PresentMode::AutoNoVsync
         };
 
         if self.present_mode != new_present_mode {
             self.present_mode = new_present_mode;
             self.surface_config.present_mode = new_present_mode;
-            self.surface = self
-                .instance
-                .create_surface(self.window.clone())
-                .expect("Failed to create surface!");
+
+            // ВАЖНО: никакого surface = instance.create_surface()!
+            // Просто обновляем конфигурацию.
             self.surface.configure(&self.device, &self.surface_config);
             log::info!("V-sync changed to: {:?}", new_present_mode);
         }
@@ -209,54 +206,63 @@ impl AppState {
             pixels_per_point: self.window.scale_factor() as f32 * self.scale_factor,
         };
 
-        let surface_texture = self.surface.get_current_texture();
-        match surface_texture {
-            Err(SurfaceError::Outdated) => {
-                info!("wgpu surface outdated");
+        let surface_texture = match self.surface.get_current_texture() {
+            Ok(st) => st,
+            Err(SurfaceError::Outdated) | Err(SurfaceError::Lost) => {
+                self.surface.configure(&self.device, &self.surface_config);
                 return;
             }
-            Err(_) => {
-                surface_texture.expect("Failed to acquire next swap chain texture");
+            Err(SurfaceError::OutOfMemory) => {
+                panic!("Surface out of memory");
+            }
+            Err(e) => {
+                log::warn!("Surface error: {:?}", e);
                 return;
             }
-            Ok(_) => {}
         };
-        let surface_texture = surface_texture.unwrap();
-        let surface_view = surface_texture
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        let mut need_reconfigure = false;
+        {
+            // ограничиваем область жизни surface_view и encoder
+            let surface_view = surface_texture
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-        self.render_pass_manager
-            .render(&surface_view, &mut encoder, &self.device);
+            self.render_pass_manager
+                .render(&surface_view, &mut encoder, &self.device);
 
-        self.egui_renderer.begin_frame(&self.window);
-        let vsync_enabled = self.vsync_enabled;
-        self.engine_gui.render_gui(
-            &mut self.color,
-            &mut self.paint,
-            &mut self.mouse_pos,
-            &mut self.brush_radius,
-            self.render_pass_manager.get_options(),
-            &mut self.vsync_enabled,
-        );
-        if vsync_enabled != self.vsync_enabled {
+            self.egui_renderer.begin_frame(&self.window);
+            let vsync_enabled = self.vsync_enabled;
+            self.engine_gui.render_gui(
+                &mut self.color,
+                &mut self.paint,
+                &mut self.mouse_pos,
+                &mut self.brush_radius,
+                self.render_pass_manager.get_options(),
+                &mut self.vsync_enabled,
+            );
+            if vsync_enabled != self.vsync_enabled {
+                need_reconfigure = true;
+            }
+            self.egui_renderer.end_frame_and_draw(
+                &self.device,
+                &self.queue,
+                &mut encoder,
+                &self.window,
+                &surface_view,
+                screen_descriptor,
+            );
+
+            self.queue.submit(Some(encoder.finish()));
+        }
+
+        surface_texture.present();
+        if need_reconfigure {
             self.set_vsync_enabled(self.vsync_enabled);
         }
-        self.egui_renderer.end_frame_and_draw(
-            &self.device,
-            &self.queue,
-            &mut encoder,
-            &self.window,
-            &surface_view,
-            screen_descriptor,
-        );
-
-        self.queue.submit(Some(encoder.finish()));
-        surface_texture.present();
         self.window.request_redraw();
     }
 
