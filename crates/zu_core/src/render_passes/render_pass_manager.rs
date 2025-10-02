@@ -8,8 +8,10 @@ use wgpu::{
 use crate::{
     render_passes::{
         distant_field_pass::{self, DistantFieldPass},
-        jfa_compute_pass::JfaComputePass,
-        jfa_pass::{self, JfaRenderPass},
+        jfa_passes::{
+            jfa_compute::JfaComputePass, jfa_compute_pass_one_shot::JfaComputeOneShotPass,
+            jfa_pass::JfaRenderPass,
+        },
         quad_vertex::QuadVertexRenderPass,
         radiance_render::{self, RadianceRenderPass, RadiansOptions},
         radiance_render_old_pass::{RadianceRenderOLDPass, RadiansOptionsOLD},
@@ -20,12 +22,19 @@ use crate::{
 };
 
 #[derive(Debug, Clone, EguiProbe)]
+enum JfaMode {
+    Compute,
+    ComputeOneShot,
+    Fragment,
+}
+
+#[derive(Debug, Clone, EguiProbe)]
 pub struct RenderOptions {
     radians_options: RadiansOptions,
     radians_options_old: RadiansOptionsOLD,
     radians_old_enabled: bool,
     jfa_passes_count: u32,
-    jfa_compute_or_fragment: bool,
+    jfa_mode: JfaMode,
     show: String,
 }
 
@@ -37,7 +46,7 @@ impl Default for RenderOptions {
             jfa_passes_count: 9,
             radians_old_enabled: false,
             show: "RadiansCascades".into(),
-            jfa_compute_or_fragment: false,
+            jfa_mode: JfaMode::Compute,
         }
     }
 }
@@ -45,6 +54,7 @@ impl Default for RenderOptions {
 pub struct RenderPassManager {
     jfa_pass: JfaRenderPass,
     jfa_compute_pass: JfaComputePass,
+    jfa_compute_one_shot_pass: JfaComputeOneShotPass,
     seed_pass: SeedRenderPass,
     radiance_old_pass: RadianceRenderOLDPass,
     radiance_pass: RadianceRenderPass,
@@ -79,6 +89,8 @@ impl RenderPassManager {
             &mut texture_manager,
         );
         let jfa_compute_pass = JfaComputePass::new(device, width, height, &mut texture_manager);
+        let jfa_compute_one_shot_pass =
+            JfaComputeOneShotPass::new(device, width, height, &mut texture_manager);
         let seed_pass = SeedRenderPass::new(device, &texture_manager, &quad_render_pass);
         let show_pass = ShowRenderPass::new(device, config, &quad_render_pass);
         let distant_field_pass = DistantFieldPass::new(
@@ -116,6 +128,7 @@ impl RenderPassManager {
             distant_field_pass,
             texture_manager,
             jfa_compute_pass,
+            jfa_compute_one_shot_pass,
         }
     }
 
@@ -123,25 +136,38 @@ impl RenderPassManager {
         self.texture_manager.resize(device, (width, height));
         self.jfa_pass.resize(width, height);
         self.jfa_compute_pass.resize(width, height);
+        self.jfa_compute_one_shot_pass.resize(width, height);
         self.radiance_old_pass.resize(width, height);
     }
 
     pub fn render(&mut self, view: &TextureView, encoder: &mut CommandEncoder, device: &Device) {
-        if !self.render_options.jfa_compute_or_fragment {
-            self.jfa_compute_pass.render(
-                encoder,
-                &self.texture_manager,
-                self.render_options.jfa_passes_count,
-            );
-        } else {
-            self.seed_pass
-                .render(encoder, &self.texture_manager, &self.quad_render_pass);
-            self.jfa_pass.multi_render(
-                encoder,
-                &self.quad_render_pass,
-                &self.texture_manager,
-                self.render_options.jfa_passes_count as i32,
-            );
+        match self.render_options.jfa_mode {
+            JfaMode::Compute => {
+                self.seed_pass
+                    .render(encoder, &self.texture_manager, &self.quad_render_pass);
+                self.jfa_compute_pass.render(
+                    encoder,
+                    &self.texture_manager,
+                    self.render_options.jfa_passes_count,
+                );
+            }
+            JfaMode::ComputeOneShot => {
+                self.jfa_compute_one_shot_pass.render(
+                    encoder,
+                    &self.texture_manager,
+                    self.render_options.jfa_passes_count,
+                );
+            }
+            JfaMode::Fragment => {
+                self.seed_pass
+                    .render(encoder, &self.texture_manager, &self.quad_render_pass);
+                self.jfa_pass.multi_render(
+                    encoder,
+                    &self.quad_render_pass,
+                    &self.texture_manager,
+                    self.render_options.jfa_passes_count as i32,
+                );
+            }
         }
         self.distant_field_pass.render(
             encoder,

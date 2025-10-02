@@ -88,7 +88,7 @@ impl JfaRenderPass {
             1.0,
         );
         let texture2 = texture_manager.create_texture(
-            "JfaTexture2",
+            "JfaTexture1",
             (width, height),
             device,
             texture_manager::TextureType::Standart,

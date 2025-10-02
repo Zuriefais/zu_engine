@@ -86,7 +86,7 @@ impl DistantFieldPass {
         quad_render_pass: &QuadVertexRenderPass,
     ) {
         let distance_texture = texture_manager
-            .get_texture_by_index(self.distance_field)
+            .get_texture("DistanceField")
             .expect("Couldn't get DistantField texture");
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Distant field  Render Pass"),
@@ -107,7 +107,7 @@ impl DistantFieldPass {
         render_pass.set_bind_group(
             0,
             texture_manager
-                .get_texture("JfaTexture2")
+                .get_texture("JfaTexture")
                 .expect("Couldn't get DistantField texture")
                 .bind_group(),
             &[],

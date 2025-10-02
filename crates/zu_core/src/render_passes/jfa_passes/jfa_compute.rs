@@ -18,13 +18,13 @@ use crate::{
 pub struct JfaConstants {
     pub one_over_size: [f32; 2],
     pub texture_size: [f32; 2],
-    pub passes: i32,
-    pub _pad: i32,
+    pub u_offset: f32, // <-- new: jump distance for this pass
+    pub _pad: f32,     // keep alignment (32 bytes total)
 }
 
 pub struct JfaComputePass {
     compute_pipeline: wgpu::ComputePipeline,
-    texture: usize,
+
     width: u32,
     height: u32,
 }
@@ -59,8 +59,15 @@ impl JfaComputePass {
             cache: Default::default(),
         });
 
-        let texture = texture_manager.create_texture(
+        texture_manager.create_texture(
             "JfaTexture",
+            (width, height),
+            device,
+            texture_manager::TextureType::Standart,
+            1.0,
+        );
+        texture_manager.create_texture(
+            "JfaTexture1",
             (width, height),
             device,
             texture_manager::TextureType::Standart,
@@ -68,7 +75,7 @@ impl JfaComputePass {
         );
         JfaComputePass {
             compute_pipeline,
-            texture,
+
             width,
             height,
         }
@@ -89,34 +96,37 @@ impl JfaComputePass {
             label: Some("JFA compute pass"),
             timestamp_writes: Default::default(),
         });
-        compute_pass.set_pipeline(&self.compute_pipeline);
-        compute_pass.set_push_constants(
-            0,
-            bytes_of(&JfaConstants {
-                one_over_size: [1.0 / self.width as f32, 1.0 / self.height as f32],
-                texture_size: [self.width as f32, self.height as f32],
-                passes: passes as i32,
-                _pad: 0,
-            }),
-        );
-        compute_pass.set_bind_group(
-            0,
-            texture_manager
-                .get_texture("SceneTexture")
-                .unwrap()
-                .compute_bind_group(),
-            &[],
-        );
-        compute_pass.set_bind_group(
-            1,
-            texture_manager
-                .get_texture("JfaTexture")
-                .unwrap()
-                .compute_mut_group(),
-            &[],
-        );
         let wg_x = (self.width + 7) / 8;
         let wg_y = (self.height + 7) / 8;
-        compute_pass.dispatch_workgroups(wg_x, wg_y, 1);
+        compute_pass.set_pipeline(&self.compute_pipeline);
+        for pass_i in 0..passes {
+            let u_offset = 2.0_f32.powi((passes - pass_i - 1) as i32);
+
+            compute_pass.set_push_constants(
+                0,
+                bytes_of(&JfaConstants {
+                    one_over_size: [1.0 / self.width as f32, 1.0 / self.height as f32],
+                    texture_size: [self.width as f32, self.height as f32],
+                    u_offset,
+                    _pad: 0.0,
+                }),
+            );
+
+            let (src, dst) = if pass_i % 2 == 0 {
+                (
+                    texture_manager.get_texture("JfaTexture").unwrap(),
+                    texture_manager.get_texture("JfaTexture1").unwrap(),
+                )
+            } else {
+                (
+                    texture_manager.get_texture("JfaTexture1").unwrap(),
+                    texture_manager.get_texture("JfaTexture").unwrap(),
+                )
+            };
+
+            compute_pass.set_bind_group(0, src.compute_bind_group(), &[]);
+            compute_pass.set_bind_group(1, dst.compute_mut_group(), &[]);
+            compute_pass.dispatch_workgroups(wg_x, wg_y, 1);
+        }
     }
 }

@@ -4,13 +4,17 @@
 @group(1) @binding(0) var distance_sampler: sampler;
 @group(1) @binding(1) var distance_texture: texture_2d<f32>;
 
+@group(2) @binding(0) var prev_sampler: sampler;
+@group(2) @binding(1) var prev_texture: texture_2d<f32>;
+
 
 struct PushConstants {
     ray_count: i32,
     accum_radiance: i32,
     max_steps: i32,
     enable_noise: i32,
-    show_grain: i32
+    show_grain: i32,
+    resolution: vec2<f32>
 }
 
 var<push_constant> constants: PushConstants;
