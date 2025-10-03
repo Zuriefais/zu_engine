@@ -23,6 +23,9 @@ glam = {version = "0.30.6", features = ["bytemuck"]}
 bytemuck = "1.23.2"
 indexmap = {workspace = true}
 
+puffin = {git = "https://github.com/EmbarkStudios/puffin/", branch = "main"}
+puffin_egui = {git = "https://github.com/EmbarkStudios/puffin/", branch = "main"}
+puffin_http = {git = "https://github.com/EmbarkStudios/puffin/", branch = "main"}
 
 
 [profile.dev]

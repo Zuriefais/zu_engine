@@ -4,15 +4,18 @@ use egui::Context;
 use egui::Widget;
 use egui_probe::Probe;
 use glam::Vec2;
+use puffin_egui::profiler_window;
 
 pub struct EngineGui {
     egui_context: Context,
+    open_profiler_window: bool,
 }
 
 impl EngineGui {
     pub fn new(context: &Context) -> Self {
         Self {
             egui_context: context.clone(),
+            open_profiler_window: false,
         }
     }
 
@@ -41,7 +44,11 @@ impl EngineGui {
             ui.add(egui::Slider::new(brush_radius, 0..=120).text("brush radius"));
             Probe::new(render_options).show(ui);
             UsageDiagnostics {}.ui(ui);
-            ui.checkbox(vsync_enabled, "Vsync enabled")
+            ui.checkbox(vsync_enabled, "Vsync enabled");
+            ui.checkbox(&mut self.open_profiler_window, "Open profiler window")
         });
+        if self.open_profiler_window {
+            profiler_window(&self.egui_context);
+        }
     }
 }

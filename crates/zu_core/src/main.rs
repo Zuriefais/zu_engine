@@ -24,6 +24,7 @@ pub fn main() {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
         console_log::init_with_level(log::Level::Trace);
     }
+    start_puffin_server();
     info!("Starting App");
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -46,4 +47,21 @@ async fn run() {
     );
 
     event_loop.run_app(&mut app).expect("Failed to run app");
+}
+
+fn start_puffin_server() {
+    puffin::set_scopes_on(true); // tell puffin to collect data
+
+    match puffin_http::Server::new("127.0.0.1:8585") {
+        Ok(puffin_server) => {
+            log::info!("Run:  cargo install puffin_viewer && puffin_viewer --url 127.0.0.1:8585");
+            // We can store the server if we want, but in this case we just want
+            // it to keep running. Dropping it closes the server, so let's not drop it!
+            #[expect(clippy::mem_forget)]
+            std::mem::forget(puffin_server);
+        }
+        Err(err) => {
+            log::error!("Failed to start puffin server: {err}");
+        }
+    }
 }

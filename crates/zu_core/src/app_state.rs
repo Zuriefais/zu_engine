@@ -8,6 +8,7 @@ use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
 use glam::Vec2;
 use log::info;
+use std::ops::DerefMut;
 use std::sync::Arc;
 use wgpu::{Instance, Limits, PresentMode};
 
@@ -159,6 +160,7 @@ impl AppState {
     }
 
     pub fn resize_surface(&mut self, width: u32, height: u32) {
+        puffin::profile_function!();
         self.surface_config.width = width;
         self.surface_config.height = height;
         self.surface.configure(&self.device, &self.surface_config);
@@ -187,6 +189,9 @@ impl AppState {
     }
 
     pub fn handle_redraw(&mut self) {
+        puffin::profile_function!();
+        puffin::GlobalProfiler::lock().new_frame();
+
         let width = self.surface_config.width;
         let height = self.surface_config.height;
 
@@ -221,8 +226,8 @@ impl AppState {
             }
         };
         let mut need_reconfigure = false;
+
         {
-            // ограничиваем область жизни surface_view и encoder
             let surface_view = surface_texture
                 .texture
                 .create_view(&wgpu::TextureViewDescriptor::default());
@@ -247,6 +252,7 @@ impl AppState {
             if vsync_enabled != self.vsync_enabled {
                 need_reconfigure = true;
             }
+
             self.egui_renderer.end_frame_and_draw(
                 &self.device,
                 &self.queue,
@@ -260,6 +266,7 @@ impl AppState {
         }
 
         surface_texture.present();
+
         if need_reconfigure {
             self.set_vsync_enabled(self.vsync_enabled);
         }

@@ -133,6 +133,7 @@ impl RenderPassManager {
     }
 
     pub fn resize(&mut self, width: u32, height: u32, device: &Device, queue: &Queue) {
+        puffin::profile_function!();
         self.texture_manager.resize(device, (width, height));
         self.jfa_pass.resize(width, height);
         self.jfa_compute_pass.resize(width, height);
@@ -141,6 +142,7 @@ impl RenderPassManager {
     }
 
     pub fn render(&mut self, view: &TextureView, encoder: &mut CommandEncoder, device: &Device) {
+        puffin::profile_function!();
         match self.render_options.jfa_mode {
             JfaMode::Compute => {
                 self.seed_pass
