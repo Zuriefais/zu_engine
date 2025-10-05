@@ -9,8 +9,14 @@ mod texture_manager;
 mod widgets;
 
 use log::info;
-
+use std::panic::{self, PanicInfo};
 use winit::event_loop::{ControlFlow, EventLoop};
+
+#[cfg(target_os = "windows")]
+use win_dialog::WinDialog;
+
+#[cfg(target_os = "windows")]
+use backtrace::Backtrace;
 
 pub fn main() {
     #[cfg(not(target_arch = "wasm32"))]
@@ -23,6 +29,29 @@ pub fn main() {
         use std::panic;
         panic::set_hook(Box::new(console_error_panic_hook::hook));
         console_log::init_with_level(log::Level::Trace);
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // Set the custom panic hook only on Windows
+        panic::set_hook(Box::new(|panic_info: &PanicInfo| {
+            // Capture panic details
+            let message = format!(
+                "Panic occurred!\n\nMessage: {}\nLocation: {}\n\nBacktrace:\n{:?}",
+                panic_info
+                    .payload()
+                    .downcast_ref::<&str>()
+                    .unwrap_or(&"Unknown"),
+                panic_info
+                    .location()
+                    .unwrap_or(&std::panic::Location::caller()),
+                Backtrace::new()
+            );
+
+            // Display Win32 MessageBox dialog via win_dialog
+            let _ = WinDialog::new(&message)
+                .with_header("Application Panic")
+                .show();
+        }));
     }
     start_puffin_server();
     info!("Starting App");

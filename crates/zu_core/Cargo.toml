@@ -27,6 +27,9 @@ puffin = {git = "https://github.com/EmbarkStudios/puffin/", branch = "main"}
 puffin_egui = {git = "https://github.com/EmbarkStudios/puffin/", branch = "main"}
 puffin_http = {git = "https://github.com/EmbarkStudios/puffin/", branch = "main"}
 
+[target.'cfg(windows)'.dependencies]
+win_dialog = "1.0.1"  # Or latest version
+backtrace = "0.3.76"   # For capturing backtraces
 
 [profile.dev]
 opt-level = 0
