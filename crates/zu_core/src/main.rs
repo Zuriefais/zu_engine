@@ -1,16 +1,7 @@
-mod app;
-mod app_state;
-pub mod camera;
-mod egui_tools;
-mod gui;
-mod render_passes;
-mod styles;
-mod texture_manager;
-mod widgets;
-
 use log::info;
 use std::panic::{self, PanicInfo};
 use winit::event_loop::{ControlFlow, EventLoop};
+use zu_core::start_puffin_server;
 
 #[cfg(target_os = "windows")]
 use win_dialog::WinDialog;
@@ -76,21 +67,4 @@ async fn run() {
     );
 
     event_loop.run_app(&mut app).expect("Failed to run app");
-}
-
-fn start_puffin_server() {
-    puffin::set_scopes_on(true); // tell puffin to collect data
-
-    match puffin_http::Server::new("127.0.0.1:8585") {
-        Ok(puffin_server) => {
-            log::info!("Run:  cargo install puffin_viewer && puffin_viewer --url 127.0.0.1:8585");
-            // We can store the server if we want, but in this case we just want
-            // it to keep running. Dropping it closes the server, so let's not drop it!
-            #[expect(clippy::mem_forget)]
-            std::mem::forget(puffin_server);
-        }
-        Err(err) => {
-            log::error!("Failed to start puffin server: {err}");
-        }
-    }
 }

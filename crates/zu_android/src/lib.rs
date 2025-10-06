@@ -13,6 +13,7 @@ pub fn android_main(app: winit::platform::android::activity::AndroidApp) {
     );
 
     log::info!("Starting engine on Android......");
+    zu_core::start_puffin_server();
     let event_loop: EventLoop<AppState> = EventLoop::<AppState>::with_user_event()
         .with_android_app(app)
         .build()
