@@ -3393,6 +3393,7 @@ name = "zu_android"
 version = "0.1.0"
 dependencies = [
  "android_logger",
+ "log",
  "winit",
  "zu_core",
 ]

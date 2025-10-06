@@ -3,8 +3,13 @@ name = "zu_android"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "zu_android"
+crate-type = ["cdylib"]
+
 [dependencies]
 zu_core = {workspace = true}
+log = {workspace = true}
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = "0.15.1"

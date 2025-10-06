@@ -12,7 +12,7 @@ class MainActivity : GameActivity() {
 
     companion object {
         init {
-            System.loadLibrary("wgpu_android_lib")
+            System.loadLibrary("zu_android")
         }
     }
 }

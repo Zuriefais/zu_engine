@@ -1,12 +1,3 @@
-import java.util.Properties
-
-val localProperties: Properties = Properties().apply {
-    val localPropertiesFile = rootProject.file("local.properties")
-    if (localPropertiesFile.exists()) {
-        load(localPropertiesFile.inputStream())
-    }
-}
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -15,8 +6,8 @@ plugins {
 
 android {
     namespace = "com.example.wgpuapplication"
-    compileSdk = 34
-    ndkVersion = localProperties.getProperty("ndkVersion")
+    compileSdk = 36
+    ndkVersion = "29.0.14033849"
 
     defaultConfig {
         applicationId = "com.example.wgpuapplication"
@@ -48,11 +39,9 @@ android {
         viewBinding = true
     }
     sourceSets {
-        getByName("androidTest") {
-            jniLibs.srcDir("$buildDir/rustJniLibs/android")
-        }
-        getByName("debug") {
-            jniLibs.srcDir("$buildDir/rustJniLibs/android")
+        getByName("main") {
+            jniLibs.srcDir("$buildDir/rustJniLibs/")
+
         }
     }
 }
@@ -61,6 +50,9 @@ cargo {
     module  = "../crates/zu_android"
     libname = "zu_android"
     targets = listOf("x86_64", "x86", "arm", "arm64")
+    cargoCommand = "/Users/zuriefais/.cargo/bin/cargo"
+    rustcCommand = "/Users/zuriefais/.cargo/bin/rustc"
+    pythonCommand = "/opt/homebrew/bin/python3.11"
 }
 
 tasks.whenTaskAdded {
@@ -70,10 +62,10 @@ tasks.whenTaskAdded {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.games:games-activity:1.1.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("androidx.core:core-ktx:1.17.0")
+    implementation("androidx.games:games-activity:2.0.0")
+    implementation("androidx.appcompat:appcompat:1.7.1")
     testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
 }
