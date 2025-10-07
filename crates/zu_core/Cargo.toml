@@ -3,6 +3,9 @@ name = "zu_core"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "zu_core"
+
 [dependencies]
 wgpu = "25.0.2"
 

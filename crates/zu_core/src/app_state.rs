@@ -87,13 +87,16 @@ impl AppState {
             .expect("Failed to create device");
 
         let swapchain_capabilities = surface.get_capabilities(&adapter);
+        info!("Supported formats: {:?}", swapchain_capabilities.formats);
+        #[cfg(target_os = "android")]
+        let selected_format = wgpu::TextureFormat::Rgba8Unorm;
+        #[cfg(not(target_os = "android"))]
         let selected_format = wgpu::TextureFormat::Bgra8Unorm;
         let swapchain_format = swapchain_capabilities
             .formats
             .iter()
             .find(|d| **d == selected_format)
             .expect("failed to select proper surface texture format!");
-        info!("Supported formats: {:?}", swapchain_capabilities.formats);
 
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
