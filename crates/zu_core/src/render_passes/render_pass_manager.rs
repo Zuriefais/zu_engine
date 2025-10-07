@@ -13,8 +13,7 @@ use crate::{
             jfa_pass::JfaRenderPass,
         },
         quad_vertex::QuadVertexRenderPass,
-        radiance_render::{self, RadianceRenderPass, RadiansOptions},
-        radiance_render_old_pass::{RadianceRenderOLDPass, RadiansOptionsOLD},
+        radiance_cascades_passes::{RadianceCascadesPassesManager, RadianceCascadesRenderOptions},
         seed_pass::{self, SeedRenderPass},
         show_pass::{self, ShowRenderPass},
     },
@@ -30,9 +29,7 @@ enum JfaMode {
 
 #[derive(Debug, Clone, EguiProbe)]
 pub struct RenderOptions {
-    radians_options: RadiansOptions,
-    radians_options_old: RadiansOptionsOLD,
-    radians_old_enabled: bool,
+    radiance_options: RadianceCascadesRenderOptions,
     jfa_passes_count: u32,
     jfa_mode: JfaMode,
     show: String,
@@ -41,11 +38,9 @@ pub struct RenderOptions {
 impl Default for RenderOptions {
     fn default() -> Self {
         Self {
-            radians_options: Default::default(),
-            radians_options_old: Default::default(),
+            radiance_options: Default::default(),
             jfa_passes_count: 9,
-            radians_old_enabled: false,
-            show: "RadiansCascades".into(),
+            show: "RadianceCascades".into(),
             jfa_mode: JfaMode::Compute,
         }
     }
@@ -56,13 +51,12 @@ pub struct RenderPassManager {
     jfa_compute_pass: JfaComputePass,
     jfa_compute_one_shot_pass: JfaComputeOneShotPass,
     seed_pass: SeedRenderPass,
-    radiance_old_pass: RadianceRenderOLDPass,
-    radiance_pass: RadianceRenderPass,
     distant_field_pass: DistantFieldPass,
     show_pass: ShowRenderPass,
     quad_render_pass: QuadVertexRenderPass,
     render_options: RenderOptions,
     texture_manager: TextureManager,
+    radiance_passes_manager: RadianceCascadesPassesManager,
 }
 
 impl RenderPassManager {
@@ -100,16 +94,7 @@ impl RenderPassManager {
             height,
             &mut texture_manager,
         );
-
-        let radiance_old_pass = RadianceRenderOLDPass::new(
-            device,
-            width,
-            height,
-            &quad_render_pass,
-            &mut texture_manager,
-        );
-
-        let radiance_pass = RadianceRenderPass::new(
+        let radiance_passes_manager = RadianceCascadesPassesManager::new(
             device,
             width,
             height,
@@ -119,8 +104,6 @@ impl RenderPassManager {
 
         Self {
             jfa_pass,
-            radiance_old_pass,
-            radiance_pass,
             quad_render_pass,
             render_options: Default::default(),
             seed_pass,
@@ -129,6 +112,7 @@ impl RenderPassManager {
             texture_manager,
             jfa_compute_pass,
             jfa_compute_one_shot_pass,
+            radiance_passes_manager,
         }
     }
 
@@ -138,7 +122,7 @@ impl RenderPassManager {
         self.jfa_pass.resize(width, height);
         self.jfa_compute_pass.resize(width, height);
         self.jfa_compute_one_shot_pass.resize(width, height);
-        self.radiance_old_pass.resize(width, height);
+        self.radiance_passes_manager.resize(width, height);
     }
 
     pub fn render(&mut self, view: &TextureView, encoder: &mut CommandEncoder, device: &Device) {
@@ -177,19 +161,10 @@ impl RenderPassManager {
             &self.texture_manager,
             &self.quad_render_pass,
         );
-
-        if self.render_options.radians_old_enabled {
-            self.radiance_old_pass.render(
-                encoder,
-                self.render_options.radians_options_old,
-                &self.texture_manager,
-                &self.quad_render_pass,
-            );
-        }
-        self.radiance_pass.render(
+        self.radiance_passes_manager.render(
+            &self.render_options.radiance_options,
             encoder,
-            self.render_options.radians_options,
-            &self.texture_manager,
+            &mut self.texture_manager,
             &self.quad_render_pass,
         );
         if let Some(texture) = self.texture_manager.get_texture(&self.render_options.show) {

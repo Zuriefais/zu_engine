@@ -16,7 +16,7 @@ use crate::{
 
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy, Zeroable, Pod)]
-struct RadiansCascadesConstants {
+struct RadianceCascadesConstants {
     ray_count: i32,
     accum_radiance: i32,
     max_steps: i32,
@@ -25,16 +25,11 @@ struct RadiansCascadesConstants {
 
 pub struct RadianceRenderOLDPass {
     render_pipeline: wgpu::RenderPipeline,
-    width: u32,
-    height: u32,
-    radiance_texture: usize,
 }
 
 impl RadianceRenderOLDPass {
     pub fn new(
         device: &Device,
-        width: u32,
-        height: u32,
         quad_render_pass: &QuadVertexRenderPass,
         texture_manager: &mut TextureManager,
     ) -> Self {
@@ -47,7 +42,7 @@ impl RadianceRenderOLDPass {
                 bind_group_layouts: &[texture_manager.get_bind_group_layout()],
                 push_constant_ranges: &[PushConstantRange {
                     stages: ShaderStages::FRAGMENT,
-                    range: 0..std::mem::size_of::<RadiansCascadesConstants>() as u32,
+                    range: 0..std::mem::size_of::<RadianceCascadesConstants>() as u32,
                 }],
             });
 
@@ -88,25 +83,8 @@ impl RadianceRenderOLDPass {
             multiview: None, // 5.
             cache: None,     // 6.
         });
-        let radiance_texture = texture_manager.create_texture(
-            "RadiansCascadesOLD",
-            (width, height),
-            device,
-            texture_manager::TextureType::Standart,
-            1.0,
-        ) as usize;
 
-        RadianceRenderOLDPass {
-            render_pipeline,
-            width,
-            height,
-            radiance_texture,
-        }
-    }
-
-    pub fn resize(&mut self, width: u32, height: u32) {
-        self.width = width;
-        self.height = height;
+        RadianceRenderOLDPass { render_pipeline }
     }
 
     pub fn render(
@@ -122,7 +100,7 @@ impl RadianceRenderOLDPass {
                 // This is what @location(0) in the fragment shader targets
                 Some(wgpu::RenderPassColorAttachment {
                     view: texture_manager
-                        .get_texture_by_index(self.radiance_texture)
+                        .get_texture("RadianceCascades")
                         .unwrap()
                         .view(),
                     resolve_target: None,
@@ -146,7 +124,7 @@ impl RadianceRenderOLDPass {
         render_pass.set_push_constants(
             ShaderStages::FRAGMENT,
             0,
-            bytes_of(&RadiansCascadesConstants {
+            bytes_of(&RadianceCascadesConstants {
                 ray_count: options.ray_count as i32,
                 accum_radiance: options.accum_radiance as i32,
                 max_steps: options.max_steps as i32,
