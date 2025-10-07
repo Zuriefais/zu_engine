@@ -1,7 +1,7 @@
 use log::info;
 use std::panic::{self, PanicInfo};
 use winit::event_loop::{ControlFlow, EventLoop};
-use zu_core::start_puffin_server;
+use zu_core::{app::App, start_puffin_server};
 
 #[cfg(target_os = "windows")]
 use win_dialog::WinDialog;
@@ -61,7 +61,7 @@ async fn run() {
 
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    let mut app = app::App::new(
+    let mut app = App::new(
         #[cfg(target_arch = "wasm32")]
         &event_loop,
     );
