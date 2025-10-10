@@ -119,6 +119,7 @@ impl ShowRenderPass {
                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                     store: wgpu::StoreOp::Store,
                 },
+                depth_slice: Default::default(),
             })],
             depth_stencil_attachment: None,
             timestamp_writes: Default::default(),

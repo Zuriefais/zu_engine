@@ -7,14 +7,14 @@ edition = "2024"
 name = "zu_core"
 
 [dependencies]
-wgpu = "25.0.2"
+wgpu = "27.0.1"
 
 #Egui stuff
 egui = { workspace = true }
-egui_extras = { version = "0.32.3", features = ["syntect"] }
-egui-wgpu = { version = "0.32.3", features = ["winit"] }
-egui-winit = { version = "0.32.3", default-features = false }
-egui-probe = {version = "0.9.0", features = ["derive"]}
+egui_extras = { version = "0.33.0", features = ["syntect"] }
+egui-wgpu = { version = "0.33.0", features = ["winit"] }
+egui-winit = { version = "0.33.0", default-features = false }
+egui-probe = {path = "../../../egui-probe", features = ["derive"]}
 
 winit = "0.30.12"
 log = { workspace = true }
@@ -26,9 +26,9 @@ glam = {version = "0.30.6", features = ["bytemuck"]}
 bytemuck = "1.23.2"
 indexmap = {workspace = true}
 
-puffin = {git = "https://github.com/EmbarkStudios/puffin/", branch = "main"}
-puffin_egui = {git = "https://github.com/EmbarkStudios/puffin/", branch = "main"}
-puffin_http = {git = "https://github.com/EmbarkStudios/puffin/", branch = "main"}
+puffin = {path = "../../../puffin/puffin"}
+puffin_egui = {path = "../../../puffin/puffin_egui"}
+puffin_http = {path = "../../../puffin/puffin_http"}
 
 [target.'cfg(windows)'.dependencies]
 win_dialog = "1.0.1"  # Or latest version

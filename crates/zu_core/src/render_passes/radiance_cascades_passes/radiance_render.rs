@@ -117,6 +117,7 @@ impl RadianceRenderPass {
                         }),
                         store: wgpu::StoreOp::Store,
                     },
+                    depth_slice: Default::default(),
                 }),
             ],
             depth_stencil_attachment: None,

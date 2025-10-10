@@ -96,8 +96,8 @@ impl JfaComputePass {
             label: Some("JFA compute pass"),
             timestamp_writes: Default::default(),
         });
-        let wg_x = (self.width + 7) / 8;
-        let wg_y = (self.height + 7) / 8;
+        let wg_x = (self.width + 7) / 16;
+        let wg_y = (self.height + 7) / 16;
         compute_pass.set_pipeline(&self.compute_pipeline);
         for pass_i in 0..passes {
             let u_offset = 2.0_f32.powi((passes - pass_i - 1) as i32);

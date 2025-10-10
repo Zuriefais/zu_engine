@@ -10,7 +10,7 @@ use glam::Vec2;
 use log::info;
 use std::ops::DerefMut;
 use std::sync::Arc;
-use wgpu::{Instance, Limits, PresentMode};
+use wgpu::{ExperimentalFeatures, Instance, Limits, PresentMode};
 
 use winit::event::WindowEvent;
 
@@ -82,6 +82,7 @@ impl AppState {
                 required_limits: limits,
                 memory_hints: Default::default(),
                 trace: wgpu::Trace::Off,
+                experimental_features: ExperimentalFeatures::disabled(),
             })
             .await
             .expect("Failed to create device");
