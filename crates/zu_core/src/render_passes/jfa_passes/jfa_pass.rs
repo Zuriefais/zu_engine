@@ -24,17 +24,15 @@ pub struct JfaRenderPass {
     render_pipeline: wgpu::RenderPipeline,
     texture1: usize,
     texture2: usize,
-    width: u32,
-    height: u32,
 }
 
 impl JfaRenderPass {
     pub fn new(
         device: &Device,
-        width: u32,
-        height: u32,
         quad_render_pass: &QuadVertexRenderPass,
         texture_manager: &mut TextureManager,
+        texture1: usize,
+        texture2: usize,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::include_wgsl!("./shaders/jfa.wgsl"));
 
@@ -80,32 +78,11 @@ impl JfaRenderPass {
             cache: None,
         });
 
-        let texture1 = texture_manager.create_texture(
-            "JfaTexture",
-            (width, height),
-            device,
-            texture_manager::TextureType::Standart,
-            1.0,
-        );
-        let texture2 = texture_manager.create_texture(
-            "JfaTexture1",
-            (width, height),
-            device,
-            texture_manager::TextureType::Standart,
-            1.0,
-        );
         JfaRenderPass {
             render_pipeline,
             texture1,
             texture2,
-            width,
-            height,
         }
-    }
-
-    pub fn resize(&mut self, width: u32, height: u32) {
-        self.width = width;
-        self.height = height;
     }
 
     pub fn render(
@@ -115,6 +92,8 @@ impl JfaRenderPass {
         output_view: &TextureView,
         offset: f32,
         quad_render_pass: &QuadVertexRenderPass,
+        width: u32,
+        height: u32,
     ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("JFA Render Pass"),
@@ -137,7 +116,7 @@ impl JfaRenderPass {
             ShaderStages::FRAGMENT,
             0,
             bytes_of(&JfaConstants {
-                one_over_size: Vec2::new(1.0 / self.width as f32, 1.0 / self.height as f32),
+                one_over_size: Vec2::new(1.0 / width as f32, 1.0 / height as f32),
                 u_offset: offset,
             }),
         );
@@ -150,7 +129,9 @@ impl JfaRenderPass {
         encoder: &mut CommandEncoder,
         quad_render_pass: &QuadVertexRenderPass,
         texture_manager: &TextureManager,
-        passes: i32,
+        passes: u32,
+        width: u32,
+        height: u32,
     ) {
         let (texture1, texture2) = (
             texture_manager.get_texture_by_index(self.texture1).unwrap(),
@@ -165,6 +146,8 @@ impl JfaRenderPass {
             &texture2.view(),
             2.0f32.powi((passes - 1) as i32),
             &quad_render_pass,
+            width,
+            height,
         );
         for i in 0..passes {
             let (texture1, texture2) = if i % 2 == 0 {
@@ -179,6 +162,8 @@ impl JfaRenderPass {
                 &texture2.view(),
                 2.0f32.powi((passes - i - 1) as i32),
                 &quad_render_pass,
+                width,
+                height,
             );
         }
     }

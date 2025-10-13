@@ -24,18 +24,10 @@ pub struct JfaConstants {
 
 pub struct JfaComputeOneShotPass {
     compute_pipeline: wgpu::ComputePipeline,
-    texture: usize,
-    width: u32,
-    height: u32,
 }
 
 impl JfaComputeOneShotPass {
-    pub fn new(
-        device: &Device,
-        width: u32,
-        height: u32,
-        texture_manager: &mut TextureManager,
-    ) -> Self {
+    pub fn new(device: &Device, texture_manager: &mut TextureManager) -> Self {
         let shader =
             device.create_shader_module(wgpu::include_wgsl!("./shaders/jfa_compute_one_shot.wgsl"));
 
@@ -60,24 +52,7 @@ impl JfaComputeOneShotPass {
             cache: Default::default(),
         });
 
-        let texture = texture_manager.create_texture(
-            "JfaTexture",
-            (width, height),
-            device,
-            texture_manager::TextureType::Standart,
-            1.0,
-        );
-        JfaComputeOneShotPass {
-            compute_pipeline,
-            texture,
-            width,
-            height,
-        }
-    }
-
-    pub fn resize(&mut self, width: u32, height: u32) {
-        self.width = width;
-        self.height = height;
+        JfaComputeOneShotPass { compute_pipeline }
     }
 
     pub fn render(
@@ -85,6 +60,8 @@ impl JfaComputeOneShotPass {
         encoder: &mut CommandEncoder,
         texture_manager: &TextureManager,
         passes: u32,
+        width: u32,
+        height: u32,
     ) {
         let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("JFA compute pass"),
@@ -94,8 +71,8 @@ impl JfaComputeOneShotPass {
         compute_pass.set_push_constants(
             0,
             bytes_of(&JfaConstants {
-                one_over_size: [1.0 / self.width as f32, 1.0 / self.height as f32],
-                texture_size: [self.width as f32, self.height as f32],
+                one_over_size: [1.0 / width as f32, 1.0 / height as f32],
+                texture_size: [width as f32, height as f32],
                 passes: passes as i32,
                 _pad: 0,
             }),
@@ -116,8 +93,8 @@ impl JfaComputeOneShotPass {
                 .compute_mut_group(),
             &[],
         );
-        let wg_x = (self.width + 7) / 8;
-        let wg_y = (self.height + 7) / 8;
+        let wg_x = (width + 7) / 8;
+        let wg_y = (height + 7) / 8;
         compute_pass.dispatch_workgroups(wg_x, wg_y, 1);
     }
 }

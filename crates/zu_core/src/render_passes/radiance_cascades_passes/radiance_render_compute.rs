@@ -111,8 +111,8 @@ impl RadianceRenderComputePass {
                 .compute_mut_group(),
             &[],
         );
-        let wg_x = (width + 7) / 8;
-        let wg_y = (height + 7) / 8;
+        let wg_x = (width + 7) / 16;
+        let wg_y = (height + 7) / 16;
         compute_pass.dispatch_workgroups(wg_x, wg_y, 1);
     }
 }

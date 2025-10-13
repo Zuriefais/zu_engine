@@ -24,7 +24,7 @@ const PI: f32 = 3.14159265;
 const TAU: f32 = 2.0 * PI;
 const EPS = 0.001f;
 
-@compute @workgroup_size(8, 8)
+@compute @workgroup_size(16, 16)
 fn fs_main(@builtin(global_invocation_id) id: vec3<u32>) {
     let pixelCoord = id.xy;
     let uv = (vec2<f32>(pixelCoord) + 0.5) / constants.resolution;
