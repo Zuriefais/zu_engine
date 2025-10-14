@@ -97,7 +97,7 @@ impl EngineTexture {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
+            format: wgpu::TextureFormat::Rgba32Float,
             usage: wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::COPY_DST
                 | wgpu::TextureUsages::RENDER_ATTACHMENT
@@ -149,7 +149,7 @@ impl EngineTexture {
 
 pub struct SceneTexture {
     texture: EngineTexture,
-    texture_data: Vec<u8>,
+    texture_data: Vec<f32>,
 }
 
 impl SceneTexture {
@@ -174,15 +174,17 @@ impl SceneTexture {
             resolution_scale,
         );
         let pixel_count = (resolution.0 * resolution.1) as usize;
-        let flat_rgba: Vec<u8> = vec![[0u8, 0u8, 0u8, 0u8]; pixel_count]
+        let flat_rgba: Vec<f32> = vec![[0f32, 0f32, 0f32, 0f32]; pixel_count]
             .into_iter()
             .flatten()
             .collect();
 
         // compute padded bytes per row & build a padded buffer
-        let unpadded_bytes_per_row = resolution.0 * 4;
+        let bytes_per_pixel = std::mem::size_of::<[f32; 4]>() as u32; // = 16
+        let unpadded_bytes_per_row = resolution.0 * bytes_per_pixel;
+
         let bytes_per_row = padded_bytes_per_row(unpadded_bytes_per_row) as usize;
-        let mut padded: Vec<u8> = vec![0; bytes_per_row * resolution.1 as usize];
+        let mut padded: Vec<f32> = vec![0f32; bytes_per_row * resolution.1 as usize];
 
         // copy each source row into the padded row
         for row in 0..resolution.1 as usize {
@@ -208,19 +210,11 @@ impl SceneTexture {
         height: u32,
         queue: &Queue,
     ) {
-        // Convert color from f32 [0.0, 1.0] to u8 [0, 255]
-        let rgba = [
-            (color[0] * 255.0) as u8,
-            (color[1] * 255.0) as u8,
-            (color[2] * 255.0) as u8,
-            (color[3] * 255.0) as u8,
-        ];
-
         let center_x = pos.x as i32;
         let center_y = pos.y as i32;
         let radius_sq = (brush_radius as i32).pow(2);
 
-        info!("Painting at {}, {}, color: {:?}", center_x, center_y, rgba);
+        info!("Painting at {}, {}, color: {:?}", center_x, center_y, color);
 
         let min_x = (center_x - brush_radius as i32).max(0) as u32;
         let max_x = (center_x + brush_radius as i32).min((width - 1) as i32) as u32;
@@ -234,8 +228,12 @@ impl SceneTexture {
         let rect_width = max_x - min_x + 1;
         let rect_height = max_y - min_y + 1;
 
-        let bytes_per_row = padded_bytes_per_row(rect_width * 4);
-        let mut patch_data = vec![0u8; (bytes_per_row * rect_height) as usize];
+        let bytes_per_pixel = std::mem::size_of::<[f32; 4]>() as u32; // = 16
+        let unpadded_bytes_per_row = rect_width * bytes_per_pixel;
+        let bytes_per_row = padded_bytes_per_row(unpadded_bytes_per_row);
+
+        let f32s_per_row = (bytes_per_row / std::mem::size_of::<f32>() as u32) as usize;
+        let mut patch_data = vec![0f32; f32s_per_row * rect_height as usize];
 
         for y_in_rect in 0..rect_height {
             for x_in_rect in 0..rect_width {
@@ -245,12 +243,12 @@ impl SceneTexture {
                 let dx = tex_x as i32 - center_x;
                 let dy = tex_y as i32 - center_y;
 
-                let patch_idx_start = (y_in_rect * bytes_per_row + x_in_rect * 4) as usize;
+                let patch_idx_start = (y_in_rect as usize * f32s_per_row + x_in_rect as usize * 4);
 
                 if dx * dx + dy * dy <= radius_sq {
-                    patch_data[patch_idx_start..patch_idx_start + 4].copy_from_slice(&rgba);
+                    patch_data[patch_idx_start..patch_idx_start + 4].copy_from_slice(&color);
                     let cpu_idx = ((tex_y * width) + tex_x) as usize * 4;
-                    self.texture_data[cpu_idx..cpu_idx + 4].copy_from_slice(&rgba);
+                    self.texture_data[cpu_idx..cpu_idx + 4].copy_from_slice(&color);
                 } else {
                     // If outside, use the existing color from our CPU-side copy
                     let cpu_idx = ((tex_y * width) + tex_x) as usize * 4;
@@ -272,7 +270,7 @@ impl SceneTexture {
                 },
                 aspect: wgpu::TextureAspect::All,
             },
-            &patch_data,
+            bytemuck::cast_slice(&patch_data),
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(bytes_per_row),
@@ -350,7 +348,7 @@ impl TextureManager {
                             visibility: wgpu::ShaderStages::COMPUTE,
                             ty: wgpu::BindingType::StorageTexture {
                                 access: wgpu::StorageTextureAccess::ReadWrite,
-                                format: TextureFormat::Rgba8Unorm,
+                                format: TextureFormat::Rgba32Float,
                                 view_dimension: wgpu::TextureViewDimension::D2,
                             },
                             count: None,

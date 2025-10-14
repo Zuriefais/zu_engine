@@ -72,9 +72,14 @@ impl AppState {
         );
 
         let features = wgpu::Features::PUSH_CONSTANTS
-            | wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES;
+            | wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
+            | wgpu::Features::FLOAT32_FILTERABLE;
         let mut limits = Limits::default();
         limits.max_push_constant_size = 128;
+        limits.max_compute_workgroup_size_x = 64;
+        limits.max_compute_workgroup_size_y = 64;
+        limits.max_compute_invocations_per_workgroup = 1024;
+
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: None,
@@ -90,7 +95,7 @@ impl AppState {
         let swapchain_capabilities = surface.get_capabilities(&adapter);
         info!("Supported formats: {:?}", swapchain_capabilities.formats);
         #[cfg(target_os = "android")]
-        let selected_format = wgpu::TextureFormat::Rgba8Unorm;
+        let selected_format = wgpu::TextureFormat::Rgba32Float;
         #[cfg(not(target_os = "android"))]
         let selected_format = wgpu::TextureFormat::Bgra8Unorm;
         let swapchain_format = swapchain_capabilities

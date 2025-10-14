@@ -18,8 +18,8 @@ use crate::{
 pub struct JfaConstants {
     pub one_over_size: [f32; 2],
     pub texture_size: [f32; 2],
-    pub u_offset: f32, // <-- new: jump distance for this pass
-    pub _pad: f32,     // keep alignment (32 bytes total)
+    pub u_offset: i32,
+    pub _pad: f32,
 }
 
 pub struct JfaComputePass {
@@ -66,11 +66,11 @@ impl JfaComputePass {
             label: Some("JFA compute pass"),
             timestamp_writes: Default::default(),
         });
-        let wg_x = (width + 7) / 16;
-        let wg_y = (height + 7) / 16;
+        let wg_x = (width + 7) / 32;
+        let wg_y = (height + 7) / 32;
         compute_pass.set_pipeline(&self.compute_pipeline);
         for pass_i in 0..passes {
-            let u_offset = 2.0_f32.powi((passes - pass_i - 1) as i32);
+            let u_offset = 2.0_f32.powi((passes - pass_i - 1) as i32) as i32;
 
             compute_pass.set_push_constants(
                 0,

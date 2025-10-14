@@ -126,12 +126,12 @@ impl RenderPassManager {
             &self.texture_manager,
             &self.quad_render_pass,
         );
-        self.radiance_passes_manager.render(
-            &self.render_options.radiance_options,
-            encoder,
-            &mut self.texture_manager,
-            &self.quad_render_pass,
-        );
+        // self.radiance_passes_manager.render(
+        //     &self.render_options.radiance_options,
+        //     encoder,
+        //     &mut self.texture_manager,
+        //     &self.quad_render_pass,
+        // );
         if let Some(texture) = self.texture_manager.get_texture(&self.render_options.show) {
             self.show_pass
                 .render(encoder, texture.bind_group(), view, &self.quad_render_pass);

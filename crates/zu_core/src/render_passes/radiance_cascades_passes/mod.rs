@@ -19,26 +19,20 @@ pub mod radiance_render_old_pass;
 
 #[derive(Debug, Clone, Copy, EguiProbe)]
 pub enum RadianceMode {
-    Fragment,
-    Compute,
-    FragmentOLD,
+    Fragment(radiance_render::RadiansOptions),
+    Compute(radiance_render_compute::RadiansOptions),
+    FragmentOLD(radiance_render_old_pass::RadiansOptionsOLD),
 }
 
 #[derive(Debug, Clone, Copy, EguiProbe)]
 pub struct RadianceCascadesRenderOptions {
-    standart_options: radiance_render::RadiansOptions,
-    old_options: radiance_render_old_pass::RadiansOptionsOLD,
-    compute_options: radiance_render_compute::RadiansOptions,
     radiance_mode: RadianceMode,
 }
 
 impl Default for RadianceCascadesRenderOptions {
     fn default() -> Self {
         Self {
-            standart_options: Default::default(),
-            old_options: Default::default(),
-            compute_options: Default::default(),
-            radiance_mode: RadianceMode::Compute,
+            radiance_mode: RadianceMode::Compute(Default::default()),
         }
     }
 }
@@ -66,6 +60,7 @@ impl RadianceCascadesPassesManager {
             texture_manager::TextureType::Standart,
             1.0,
         );
+        (10..10000).into_iter().map(|num| num + 10).sum::<i32>();
         let old_pass = RadianceRenderOLDPass::new(device, quad_render_pass, texture_manager);
         let pass = RadianceRenderPass::new(device, quad_render_pass, texture_manager);
         let compute = RadianceRenderComputePass::new(device, texture_manager);
@@ -91,30 +86,17 @@ impl RadianceCascadesPassesManager {
         quad_render_pass: &QuadVertexRenderPass,
     ) {
         match render_options.radiance_mode {
-            RadianceMode::Fragment => {
-                self.pass.render(
-                    encoder,
-                    render_options.standart_options,
-                    texture_manager,
-                    quad_render_pass,
-                );
+            RadianceMode::Fragment(options) => {
+                self.pass
+                    .render(encoder, options, texture_manager, quad_render_pass);
             }
-            RadianceMode::Compute => {
-                self.compute.render(
-                    encoder,
-                    texture_manager,
-                    render_options.compute_options,
-                    self.width,
-                    self.height,
-                );
+            RadianceMode::Compute(options) => {
+                self.compute
+                    .render(encoder, texture_manager, options, self.width, self.height);
             }
-            RadianceMode::FragmentOLD => {
-                self.old_pass.render(
-                    encoder,
-                    render_options.old_options,
-                    texture_manager,
-                    quad_render_pass,
-                );
+            RadianceMode::FragmentOLD(options) => {
+                self.old_pass
+                    .render(encoder, options, texture_manager, quad_render_pass);
             }
         }
     }

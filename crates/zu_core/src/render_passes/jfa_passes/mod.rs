@@ -36,7 +36,7 @@ impl Default for JfaRenderOptions {
     fn default() -> Self {
         Self {
             passes: 9,
-            mode: JFAMode::ComputeStar,
+            mode: JFAMode::Compute,
         }
     }
 }

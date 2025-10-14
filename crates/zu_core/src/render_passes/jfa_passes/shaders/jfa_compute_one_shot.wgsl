@@ -1,6 +1,6 @@
 @group(0) @binding(0) var scene_texture: texture_2d<f32>;
 
-@group(1) @binding(0) var output_texture: texture_storage_2d<rgba8unorm, read_write>;
+@group(1) @binding(0) var output_texture: texture_storage_2d<rgba32float, read_write>;
 
 @group(2) @binding(0) var<storage, read_write> global_counter: atomic<u32>;
 
