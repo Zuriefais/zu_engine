@@ -11,7 +11,7 @@ use wgpu::{
 
 use crate::{
     render_passes::quad_vertex::QuadVertexRenderPass,
-    texture_manager::{self, TextureManager},
+    texture_manager::{self, TextureManager, textures::EngineTexture},
     vertex_state_for_quad,
 };
 
@@ -156,7 +156,7 @@ impl JfaComputeStarPass {
             };
 
             compute_pass.set_bind_group(0, src.compute_bind_group(), &[]);
-            compute_pass.set_bind_group(1, dst.compute_mut_group(), &[]);
+            compute_pass.set_bind_group(1, dst.compute_mut_group_f32(), &[]);
             compute_pass.set_bind_group(2, &self.noise_bind_group, &[]);
             compute_pass.dispatch_workgroups(wg_x, wg_y, 1);
         }

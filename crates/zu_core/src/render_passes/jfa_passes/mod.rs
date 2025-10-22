@@ -15,7 +15,7 @@ use crate::{
         quad_vertex::QuadVertexRenderPass,
         seed_pass::SeedRenderPass,
     },
-    texture_manager::{TextureManager, TextureType},
+    texture_manager::{TextureManager, textures::TextureType},
 };
 
 #[derive(Debug, Clone, Copy, EguiProbe)]
@@ -61,7 +61,7 @@ impl JfaPassesManager {
             "RadianceCascades",
             (width, height),
             device,
-            TextureType::Standart,
+            TextureType::Standard,
             1.0,
         );
         let (texture1, texture2) = (
@@ -69,14 +69,14 @@ impl JfaPassesManager {
                 "JfaTexture",
                 (width, height),
                 device,
-                TextureType::Standart,
+                TextureType::Standard,
                 1.0,
             ),
             texture_manager.create_texture(
                 "JfaTexture1",
                 (width, height),
                 device,
-                TextureType::Standart,
+                TextureType::Standard,
                 1.0,
             ),
         );

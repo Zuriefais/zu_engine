@@ -6,8 +6,8 @@ use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
 };
 
-use crate::vertex_state_for_quad;
 use crate::{render_passes::quad_vertex::QuadVertexRenderPass, texture_manager::TextureManager};
+use crate::{texture_manager::textures::EngineTexture, vertex_state_for_quad};
 
 pub struct SeedRenderPass {
     render_pipeline: wgpu::RenderPipeline,

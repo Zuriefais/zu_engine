@@ -16,7 +16,6 @@ fn fs_main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     let current_value = textureLoad(input_texture, vec2<i32>(pixelCoord), 0);
     if current_value.z == 1.0 {
-
         textureStore(output_texture, vec2<i32>(pixelCoord), current_value);
         return;
     }

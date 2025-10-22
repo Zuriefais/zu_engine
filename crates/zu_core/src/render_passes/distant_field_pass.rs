@@ -6,8 +6,8 @@ use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
 };
 
-use crate::vertex_state_for_quad;
 use crate::{render_passes::quad_vertex::QuadVertexRenderPass, texture_manager::TextureManager};
+use crate::{texture_manager::textures::EngineTexture, vertex_state_for_quad};
 
 pub struct DistantFieldPass {
     render_pipeline: wgpu::RenderPipeline,
@@ -29,7 +29,7 @@ impl DistantFieldPass {
             "DistanceField",
             (width, height),
             device,
-            crate::texture_manager::TextureType::Standart,
+            crate::texture_manager::textures::TextureType::Standard,
             1.0,
         );
 

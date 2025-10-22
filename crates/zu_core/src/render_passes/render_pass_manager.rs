@@ -17,7 +17,10 @@ use crate::{
         seed_pass::{self, SeedRenderPass},
         show_pass::{self, ShowRenderPass},
     },
-    texture_manager::{self, ManagedTexture, TextureManager},
+    texture_manager::{
+        self, TextureManager,
+        textures::{EngineTexture, ManagedTexture, TextureType},
+    },
 };
 
 #[derive(Debug, Clone, EguiProbe)]
@@ -61,7 +64,7 @@ impl RenderPassManager {
             "SceneTexture",
             (width, height),
             device,
-            texture_manager::TextureType::SceneTexture,
+            TextureType::SceneTexture,
             1.0,
         );
         let quad_render_pass = QuadVertexRenderPass::new(device);
@@ -126,12 +129,12 @@ impl RenderPassManager {
             &self.texture_manager,
             &self.quad_render_pass,
         );
-        // self.radiance_passes_manager.render(
-        //     &self.render_options.radiance_options,
-        //     encoder,
-        //     &mut self.texture_manager,
-        //     &self.quad_render_pass,
-        // );
+        self.radiance_passes_manager.render(
+            &self.render_options.radiance_options,
+            encoder,
+            &mut self.texture_manager,
+            &self.quad_render_pass,
+        );
         if let Some(texture) = self.texture_manager.get_texture(&self.render_options.show) {
             self.show_pass
                 .render(encoder, texture.bind_group(), view, &self.quad_render_pass);

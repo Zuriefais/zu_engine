@@ -10,7 +10,7 @@ use crate::{
             radiance_render_old_pass::RadianceRenderOLDPass,
         },
     },
-    texture_manager::{self, TextureManager},
+    texture_manager::{self, TextureManager, textures::TextureType},
 };
 
 pub mod radiance_render;
@@ -57,10 +57,10 @@ impl RadianceCascadesPassesManager {
             "RadianceCascades",
             (width, height),
             device,
-            texture_manager::TextureType::Standart,
+            TextureType::Standard,
             1.0,
         );
-        (10..10000).into_iter().map(|num| num + 10).sum::<i32>();
+
         let old_pass = RadianceRenderOLDPass::new(device, quad_render_pass, texture_manager);
         let pass = RadianceRenderPass::new(device, quad_render_pass, texture_manager);
         let compute = RadianceRenderComputePass::new(device, texture_manager);

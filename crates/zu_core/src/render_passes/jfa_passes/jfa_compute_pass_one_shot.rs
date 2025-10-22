@@ -9,7 +9,7 @@ use wgpu::{
 
 use crate::{
     render_passes::quad_vertex::QuadVertexRenderPass,
-    texture_manager::{self, TextureManager},
+    texture_manager::{self, TextureManager, textures::EngineTexture},
     vertex_state_for_quad,
 };
 
@@ -90,7 +90,7 @@ impl JfaComputeOneShotPass {
             texture_manager
                 .get_texture("JfaTexture")
                 .unwrap()
-                .compute_mut_group(),
+                .compute_mut_group_f32(),
             &[],
         );
         let wg_x = (width + 7) / 8;
