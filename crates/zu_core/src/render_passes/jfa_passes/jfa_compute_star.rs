@@ -1,23 +1,15 @@
 use bytemuck::{Pod, Zeroable, bytes_of};
-use glam::Vec2;
-use log::info;
 use rand::RngCore;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, Buffer, BufferUsages, CommandEncoder, ComputePipelineDescriptor, Device,
-    PushConstantRange, Queue, ShaderStages, TextureView,
-    util::{BufferInitDescriptor, DeviceExt, RenderEncoder},
+    BindGroup, BindGroupLayout, Buffer, CommandEncoder, ComputePipelineDescriptor, Device,
+    PushConstantRange, ShaderStages,
+    util::{DeviceExt, RenderEncoder},
 };
 
-use crate::{
-    render_passes::quad_vertex::QuadVertexRenderPass,
-    texture_manager::{self, TextureManager, textures::EngineTexture},
-    vertex_state_for_quad,
-};
+use crate::texture_manager::{TextureManager, textures::EngineTexture};
 
 fn create_noise_buffer(device: &Device, width: u32, height: u32) -> Buffer {
     let noise_data: Vec<f32> = (0..width * height)
-        .into_iter()
         .map(|_| rand::rng().next_u32() as f32)
         .collect();
     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -66,7 +58,7 @@ impl JfaComputeStarPass {
                 }],
             });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some(&"Jfa compute pass layout descriptor"),
+            label: Some("Jfa compute pass layout descriptor"),
             bind_group_layouts: &[
                 texture_manager.get_compute_bind_group_layout(),
                 texture_manager.get_compute_mut_bind_group_layout(),

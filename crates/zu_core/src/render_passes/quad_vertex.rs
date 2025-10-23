@@ -81,7 +81,7 @@ macro_rules! vertex_state_for_quad {
         wgpu::VertexState {
             module: &$render_pass.shader,
             entry_point: Some("vs_main"),
-            buffers: &[crate::render_passes::quad_vertex::QuadVertex::desc()],
+            buffers: &[$crate::render_passes::quad_vertex::QuadVertex::desc()],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         }
     };

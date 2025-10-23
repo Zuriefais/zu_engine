@@ -1,15 +1,11 @@
-use egui::Scene;
-use glam::Vec2;
-use indexmap::IndexMap;
-use log::info;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, Device, Queue, Sampler,
-    Texture, TextureFormat, TextureView,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, Device, Sampler,
+    Texture, TextureView,
 };
 
 use crate::texture_manager::{
     BindGroupLayouts,
-    textures::{EngineTexture, scene_texture::SceneTexture},
+    textures::EngineTexture,
 };
 
 pub struct StandardTextureF16 {

@@ -8,7 +8,6 @@ use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
 use glam::Vec2;
 use log::info;
-use std::ops::DerefMut;
 use std::sync::Arc;
 use wgpu::{ExperimentalFeatures, Instance, Limits, PresentMode};
 

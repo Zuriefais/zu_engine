@@ -1,24 +1,21 @@
 use egui_probe::EguiProbe;
 use glam::Vec2;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource,
-    CommandEncoder, Device, Queue, Sampler, Texture, TextureView,
+    CommandEncoder, Device, Queue, TextureView,
 };
 
 use crate::{
     render_passes::{
-        distant_field_pass::{self, DistantFieldPass},
+        distant_field_pass::DistantFieldPass,
         jfa_passes::{
-            JfaPassesManager, JfaRenderOptions, jfa_compute::JfaComputePass,
-            jfa_compute_pass_one_shot::JfaComputeOneShotPass, jfa_pass::JfaRenderPass,
+            JfaPassesManager, JfaRenderOptions,
         },
         quad_vertex::QuadVertexRenderPass,
         radiance_cascades_passes::{RadianceCascadesPassesManager, RadianceCascadesRenderOptions},
-        seed_pass::{self, SeedRenderPass},
-        show_pass::{self, ShowRenderPass},
+        show_pass::ShowRenderPass,
     },
     texture_manager::{
-        self, TextureManager,
+        TextureManager,
         textures::{EngineTexture, ManagedTexture, TextureType},
     },
 };

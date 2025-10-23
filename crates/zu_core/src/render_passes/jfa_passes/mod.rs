@@ -4,7 +4,7 @@ pub mod jfa_compute_star;
 pub mod jfa_pass;
 
 use egui_probe::EguiProbe;
-use wgpu::{CommandEncoder, Device, Queue};
+use wgpu::{CommandEncoder, Device};
 
 use crate::{
     render_passes::{

@@ -1,5 +1,4 @@
 use log::info;
-use std::panic::{self, PanicInfo};
 use winit::event_loop::{ControlFlow, EventLoop};
 use zu_core::{app::App, start_puffin_server};
 

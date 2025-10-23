@@ -5,12 +5,8 @@ use crate::texture_manager::{
     },
 };
 
-use glam::Vec2;
-use indexmap::IndexMap;
-use log::info;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, Device, Queue, Sampler,
-    Texture, TextureFormat, TextureView,
+    BindGroup, Device, Sampler, TextureView,
 };
 
 pub mod scene_texture;
@@ -147,7 +143,7 @@ impl ManagedTexture {
 
     pub fn standard(&self) -> Option<&StandardTexture> {
         if let ManagedTexture::Standart(standart) = self {
-            Some(&standart)
+            Some(standart)
         } else {
             None
         }
@@ -155,7 +151,7 @@ impl ManagedTexture {
 
     pub fn standard_f16(&self) -> Option<&StandardTextureF16> {
         if let ManagedTexture::StandartF16(standart) = self {
-            Some(&standart)
+            Some(standart)
         } else {
             None
         }
@@ -163,7 +159,7 @@ impl ManagedTexture {
 
     pub fn scene(&self) -> Option<&SceneTexture> {
         if let ManagedTexture::SceneTexture(scene) = self {
-            Some(&scene)
+            Some(scene)
         } else {
             None
         }

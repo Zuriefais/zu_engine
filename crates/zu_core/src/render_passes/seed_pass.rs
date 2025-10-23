@@ -1,9 +1,5 @@
-use glam::Vec2;
-use log::info;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindingResource, Buffer, BufferUsages,
-    CommandEncoder, Device, Queue, TextureView,
-    util::{BufferInitDescriptor, DeviceExt},
+    CommandEncoder, Device,
 };
 
 use crate::{render_passes::quad_vertex::QuadVertexRenderPass, texture_manager::TextureManager};
@@ -23,7 +19,7 @@ impl SeedRenderPass {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Seed Pipeline Layout"),
-            bind_group_layouts: &[&texture_manager.get_bind_group_layout()],
+            bind_group_layouts: &[texture_manager.get_bind_group_layout()],
             push_constant_ranges: &[],
         });
 

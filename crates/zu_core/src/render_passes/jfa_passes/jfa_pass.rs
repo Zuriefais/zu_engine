@@ -1,15 +1,14 @@
 use bytemuck::{Pod, Zeroable, bytes_of};
 use glam::Vec2;
-use log::info;
 use wgpu::{
-    BindGroup, Buffer, BufferUsages, CommandEncoder, Device, PushConstantRange, Queue,
+    BindGroup, CommandEncoder, Device, PushConstantRange,
     ShaderStages, TextureView,
-    util::{BufferInitDescriptor, DeviceExt, RenderEncoder},
+    util::RenderEncoder,
 };
 
 use crate::{
     render_passes::quad_vertex::QuadVertexRenderPass,
-    texture_manager::{self, TextureManager, textures::EngineTexture},
+    texture_manager::{TextureManager, textures::EngineTexture},
     vertex_state_for_quad,
 };
 
@@ -38,7 +37,7 @@ impl JfaRenderPass {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("JFA Pipeline Layout"),
-            bind_group_layouts: &[&texture_manager.get_bind_group_layout()],
+            bind_group_layouts: &[texture_manager.get_bind_group_layout()],
             push_constant_ranges: &[PushConstantRange {
                 stages: ShaderStages::FRAGMENT,
                 range: 0..std::mem::size_of::<JfaConstants>() as u32,
@@ -139,13 +138,13 @@ impl JfaRenderPass {
         );
         self.render(
             encoder,
-            &texture_manager
+            texture_manager
                 .get_texture("SceneTexture")
                 .unwrap()
                 .bind_group(),
-            &texture2.view(),
+            texture2.view(),
             2.0f32.powi((passes - 1) as i32),
-            &quad_render_pass,
+            quad_render_pass,
             width,
             height,
         );
@@ -158,10 +157,10 @@ impl JfaRenderPass {
 
             self.render(
                 encoder,
-                &texture1.bind_group(),
-                &texture2.view(),
+                texture1.bind_group(),
+                texture2.view(),
                 2.0f32.powi((passes - i - 1) as i32),
-                &quad_render_pass,
+                quad_render_pass,
                 width,
                 height,
             );

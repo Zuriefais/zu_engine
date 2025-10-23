@@ -1,17 +1,11 @@
 use bytemuck::{Pod, Zeroable, bytes_of};
-use glam::Vec2;
-use log::info;
 use wgpu::{
-    BindGroup, Buffer, BufferUsages, CommandEncoder, ComputePipelineDescriptor, Device,
-    PushConstantRange, Queue, ShaderStages, TextureView,
-    util::{BufferInitDescriptor, DeviceExt, RenderEncoder},
+    CommandEncoder, ComputePipelineDescriptor, Device,
+    PushConstantRange, ShaderStages,
+    util::RenderEncoder,
 };
 
-use crate::{
-    render_passes::quad_vertex::QuadVertexRenderPass,
-    texture_manager::{self, TextureManager, textures::EngineTexture},
-    vertex_state_for_quad,
-};
+use crate::texture_manager::{TextureManager, textures::EngineTexture};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Zeroable, Pod)]
@@ -32,7 +26,7 @@ impl JfaComputeOneShotPass {
             device.create_shader_module(wgpu::include_wgsl!("./shaders/jfa_compute_one_shot.wgsl"));
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some(&"Jfa compute pass layout descriptor"),
+            label: Some("Jfa compute pass layout descriptor"),
             bind_group_layouts: &[
                 texture_manager.get_compute_bind_group_layout(),
                 texture_manager.get_compute_mut_bind_group_layout(),
@@ -93,8 +87,8 @@ impl JfaComputeOneShotPass {
                 .compute_mut_group_f32(),
             &[],
         );
-        let wg_x = (width + 7) / 8;
-        let wg_y = (height + 7) / 8;
+        let wg_x = width.div_ceil(8);
+        let wg_y = height.div_ceil(8);
         compute_pass.dispatch_workgroups(wg_x, wg_y, 1);
     }
 }

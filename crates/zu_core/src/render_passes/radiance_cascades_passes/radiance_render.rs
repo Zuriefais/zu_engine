@@ -1,16 +1,13 @@
 use bytemuck::{Pod, Zeroable, bytes_of};
 use egui_probe::EguiProbe;
-use glam::Vec2;
-use log::info;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindingResource, Buffer, BufferUsages,
-    CommandEncoder, Device, PushConstantRange, Queue, ShaderStages, TextureView,
-    util::{BufferInitDescriptor, DeviceExt, RenderEncoder},
+    CommandEncoder, Device, PushConstantRange, ShaderStages,
+    util::RenderEncoder,
 };
 
 use crate::{
     render_passes::quad_vertex::QuadVertexRenderPass,
-    texture_manager::{self, TextureManager, textures::EngineTexture},
+    texture_manager::{TextureManager, textures::EngineTexture},
     vertex_state_for_quad,
 };
 

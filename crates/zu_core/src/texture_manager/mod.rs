@@ -1,11 +1,8 @@
 pub mod textures;
 
-use glam::Vec2;
 use indexmap::IndexMap;
-use log::info;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, Device, Queue, Sampler,
-    Texture, TextureFormat, TextureView,
+    BindGroupLayout, Device, Sampler, TextureFormat,
 };
 
 use crate::texture_manager::textures::{EngineTexture, ManagedTexture, TextureType};

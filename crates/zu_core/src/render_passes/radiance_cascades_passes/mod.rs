@@ -1,5 +1,5 @@
 use egui_probe::EguiProbe;
-use wgpu::{CommandEncoder, Device, Queue};
+use wgpu::{CommandEncoder, Device};
 
 use crate::{
     render_passes::{
@@ -10,7 +10,7 @@ use crate::{
             radiance_render_old_pass::RadianceRenderOLDPass,
         },
     },
-    texture_manager::{self, TextureManager, textures::TextureType},
+    texture_manager::{TextureManager, textures::TextureType},
 };
 
 pub mod radiance_render;

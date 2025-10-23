@@ -1,9 +1,5 @@
-use glam::Vec2;
-use log::info;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindingResource, Buffer, BufferUsages,
-    CommandEncoder, Device, Queue, TextureView,
-    util::{BufferInitDescriptor, DeviceExt},
+    CommandEncoder, Device,
 };
 
 use crate::{render_passes::quad_vertex::QuadVertexRenderPass, texture_manager::TextureManager};

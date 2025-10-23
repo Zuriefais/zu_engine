@@ -16,6 +16,12 @@ pub struct App {
     state: Option<AppState>,
 }
 
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl App {
     pub fn new(#[cfg(target_arch = "wasm32")] event_loop: &EventLoop<AppState>) -> Self {
         #[cfg(target_arch = "wasm32")]

@@ -1,9 +1,7 @@
 use glam::Vec2;
-use indexmap::IndexMap;
 use log::info;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, Device, Queue, Sampler,
-    Texture, TextureFormat, TextureView,
+    BindGroup, Device, Queue, Sampler, TextureView,
 };
 
 use crate::texture_manager::{
@@ -18,15 +16,15 @@ pub struct SceneTexture {
 
 impl EngineTexture for SceneTexture {
     fn view(&self) -> &TextureView {
-        &self.texture.view()
+        self.texture.view()
     }
 
     fn bind_group(&self) -> &BindGroup {
-        &self.texture.bind_group()
+        self.texture.bind_group()
     }
 
     fn compute_bind_group(&self) -> &BindGroup {
-        &self.texture.compute_bind_group()
+        self.texture.compute_bind_group()
     }
 
     fn compute_mut_group_f32(&self) -> Option<&BindGroup> {
@@ -148,7 +146,7 @@ impl SceneTexture {
                 let dx = tex_x as i32 - center_x;
                 let dy = tex_y as i32 - center_y;
 
-                let patch_idx_start = (y_in_rect as usize * f32s_per_row + x_in_rect as usize * 4);
+                let patch_idx_start = y_in_rect as usize * f32s_per_row + x_in_rect as usize * 4;
 
                 if dx * dx + dy * dy <= radius_sq {
                     patch_data[patch_idx_start..patch_idx_start + 4].copy_from_slice(&color);
