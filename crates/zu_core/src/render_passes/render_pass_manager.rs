@@ -1,17 +1,13 @@
 use egui_probe::EguiProbe;
 use glam::Vec2;
-use wgpu::{
-    CommandEncoder, Device, Queue, TextureView,
-};
+use wgpu::{CommandEncoder, Device, Queue, TextureView};
 
 use crate::{
     render_passes::{
         distant_field_pass::DistantFieldPass,
-        jfa_passes::{
-            JfaPassesManager, JfaRenderOptions,
-        },
+        jfa_passes::{JfaPassesManager, JfaRenderOptions},
         quad_vertex::QuadVertexRenderPass,
-        radiance_cascades_passes::{RadianceCascadesPassesManager, RadianceCascadesRenderOptions},
+        radiance_cascades_passes::{self, RadianceCascadesPassesManager},
         show_pass::ShowRenderPass,
     },
     texture_manager::{
@@ -22,7 +18,7 @@ use crate::{
 
 #[derive(Debug, Clone, EguiProbe)]
 pub struct RenderOptions {
-    radiance_options: RadianceCascadesRenderOptions,
+    radiance_options: radiance_cascades_passes::radiance_render_compute::RadiansOptions,
     jfa_options: JfaRenderOptions,
     show: String,
 }
@@ -80,13 +76,8 @@ impl RenderPassManager {
             height,
             &mut texture_manager,
         );
-        let radiance_passes_manager = RadianceCascadesPassesManager::new(
-            device,
-            width,
-            height,
-            &quad_render_pass,
-            &mut texture_manager,
-        );
+        let radiance_passes_manager =
+            RadianceCascadesPassesManager::new(device, width, height, &mut texture_manager);
 
         Self {
             quad_render_pass,
@@ -104,33 +95,29 @@ impl RenderPassManager {
     pub fn resize(&mut self, width: u32, height: u32, device: &Device, queue: &Queue) {
         puffin::profile_function!();
         self.texture_manager.resize(device, (width, height));
-        self.jfa_passes_manager.resize(device, width, height);
-        self.radiance_passes_manager.resize(width, height);
         self.width = width;
         self.height = height;
     }
 
     pub fn render(&mut self, view: &TextureView, encoder: &mut CommandEncoder, device: &Device) {
         puffin::profile_function!();
-        self.jfa_passes_manager.render(
+        let jfa_texture = self.jfa_passes_manager.render(
             &self.render_options.jfa_options,
             encoder,
             &mut self.texture_manager,
             &self.quad_render_pass,
-            self.width,
-            self.height,
         );
         self.distant_field_pass.render(
             encoder,
             device,
             &self.texture_manager,
             &self.quad_render_pass,
+            jfa_texture,
         );
         self.radiance_passes_manager.render(
             &self.render_options.radiance_options,
             encoder,
             &mut self.texture_manager,
-            &self.quad_render_pass,
         );
         if let Some(texture) = self.texture_manager.get_texture(&self.render_options.show) {
             self.show_pass

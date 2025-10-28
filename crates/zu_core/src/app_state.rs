@@ -65,14 +65,15 @@ impl AppState {
             .await
             .expect("Unable request adapter");
         info!(
-            "Adapter features: {:#}, limits: {:#?}",
+            "Adapter features: {:#}, \n limits: {:#?}",
             adapter.features(),
             adapter.limits()
         );
 
         let features = wgpu::Features::PUSH_CONSTANTS
             | wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
-            | wgpu::Features::FLOAT32_FILTERABLE;
+            | wgpu::Features::FLOAT32_FILTERABLE
+            | wgpu::Features::SHADER_F16;
         let mut limits = Limits::default();
         limits.max_push_constant_size = 128;
         limits.max_compute_workgroup_size_x = 64;

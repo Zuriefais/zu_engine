@@ -1,15 +1,19 @@
 pub mod textures;
 
 use indexmap::IndexMap;
-use wgpu::{
-    BindGroupLayout, Device, Sampler, TextureFormat,
-};
+use wgpu::{BindGroupLayout, Device, Sampler, TextureFormat};
 
 use crate::texture_manager::textures::{EngineTexture, ManagedTexture, TextureType};
 
+pub type TextureHandle = usize;
+
 pub struct BindGroupLayouts {
     compute_texture: BindGroupLayout,
-    compute_mut_texture: BindGroupLayout,
+    compute_storage_f16_texture: BindGroupLayout,
+    compute_storage_rgf16_texture: BindGroupLayout,
+    compute_storage_mut_texture: BindGroupLayout,
+    compute_storage_mut_f16_texture: BindGroupLayout,
+    compute_storage_mut_rgf16_texture: BindGroupLayout,
     texture: BindGroupLayout,
 }
 
@@ -50,15 +54,75 @@ impl BindGroupLayouts {
                     count: None,
                 }],
             }),
-            compute_mut_texture: device.create_bind_group_layout(
+            compute_storage_f16_texture: device.create_bind_group_layout(
                 &wgpu::BindGroupLayoutDescriptor {
                     label: Some("Compute mut texture Bind Group Layout"),
                     entries: &[wgpu::BindGroupLayoutEntry {
                         binding: 0,
                         visibility: wgpu::ShaderStages::COMPUTE,
                         ty: wgpu::BindingType::StorageTexture {
-                            access: wgpu::StorageTextureAccess::ReadWrite,
+                            access: wgpu::StorageTextureAccess::ReadOnly,
+                            format: TextureFormat::Rgba16Float,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        count: None,
+                    }],
+                },
+            ),
+            compute_storage_mut_texture: device.create_bind_group_layout(
+                &wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Compute mut texture Bind Group Layout"),
+                    entries: &[wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::StorageTexture {
+                            access: wgpu::StorageTextureAccess::WriteOnly,
                             format: TextureFormat::Rgba32Float,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        count: None,
+                    }],
+                },
+            ),
+            compute_storage_mut_f16_texture: device.create_bind_group_layout(
+                &wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Compute mut texture Bind Group Layout"),
+                    entries: &[wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::StorageTexture {
+                            access: wgpu::StorageTextureAccess::WriteOnly,
+                            format: TextureFormat::Rgba16Float,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        count: None,
+                    }],
+                },
+            ),
+            compute_storage_rgf16_texture: device.create_bind_group_layout(
+                &wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Compute mut texture Bind Group Layout"),
+                    entries: &[wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::StorageTexture {
+                            access: wgpu::StorageTextureAccess::ReadOnly,
+                            format: TextureFormat::Rg16Float,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        count: None,
+                    }],
+                },
+            ),
+            compute_storage_mut_rgf16_texture: device.create_bind_group_layout(
+                &wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Compute mut texture Bind Group Layout"),
+                    entries: &[wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::StorageTexture {
+                            access: wgpu::StorageTextureAccess::WriteOnly,
+                            format: TextureFormat::Rg16Float,
                             view_dimension: wgpu::TextureViewDimension::D2,
                         },
                         count: None,
@@ -101,7 +165,7 @@ impl TextureManager {
         device: &Device,
         texture_type: TextureType,
         resolution_scale: f32,
-    ) -> usize {
+    ) -> TextureHandle {
         self.textures.insert(
             name.to_string(),
             ManagedTexture::new(
@@ -122,7 +186,7 @@ impl TextureManager {
         self.textures.get(name)
     }
 
-    pub fn get_texture_by_index(&self, i: usize) -> Option<&ManagedTexture> {
+    pub fn get_texture_by_index(&self, i: TextureHandle) -> Option<&ManagedTexture> {
         self.textures.get_index(i).map(|(_, v)| v)
     }
 
@@ -130,8 +194,12 @@ impl TextureManager {
         self.textures.get_mut(name)
     }
 
-    pub fn get_texture_by_index_mut(&mut self, i: usize) -> Option<&mut ManagedTexture> {
+    pub fn get_texture_by_index_mut(&mut self, i: TextureHandle) -> Option<&mut ManagedTexture> {
         self.textures.get_index_mut(i).map(|(_, v)| v)
+    }
+
+    pub fn get_texture_handle_by_name(&self, name: &str) -> Option<TextureHandle> {
+        self.textures.get_index_of(name)
     }
 
     pub fn resize(&mut self, device: &Device, resolution: (u32, u32)) {
@@ -155,8 +223,24 @@ impl TextureManager {
         &self.bind_group_layouts.compute_texture
     }
 
-    pub fn get_compute_mut_bind_group_layout(&self) -> &BindGroupLayout {
-        &self.bind_group_layouts.compute_mut_texture
+    pub fn get_compute_storage_f16_bind_group_layout(&self) -> &BindGroupLayout {
+        &self.bind_group_layouts.compute_storage_f16_texture
+    }
+
+    pub fn get_compute_storage_rgf16_bind_group_layout(&self) -> &BindGroupLayout {
+        &self.bind_group_layouts.compute_storage_rgf16_texture
+    }
+
+    pub fn get_compute_storage_mut_bind_group_layout(&self) -> &BindGroupLayout {
+        &self.bind_group_layouts.compute_storage_mut_texture
+    }
+
+    pub fn get_compute_storage_mut_f16_bind_group_layout(&self) -> &BindGroupLayout {
+        &self.bind_group_layouts.compute_storage_mut_f16_texture
+    }
+
+    pub fn get_compute_storage_mut_rgf16_bind_group_layout(&self) -> &BindGroupLayout {
+        &self.bind_group_layouts.compute_storage_mut_rgf16_texture
     }
 
     pub fn get_bind_group_layouts(&self) -> &BindGroupLayouts {

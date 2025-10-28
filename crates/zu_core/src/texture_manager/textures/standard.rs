@@ -1,7 +1,4 @@
-use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, Device, Sampler,
-    Texture, TextureView,
-};
+use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, Device, Sampler, Texture, TextureView};
 
 use crate::texture_manager::{BindGroupLayouts, textures::EngineTexture};
 
@@ -66,7 +63,7 @@ impl StandardTexture {
         });
         let compute_mut_bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some("Compute mut texture Bind Group"),
-            layout: &bind_group_layouts.compute_mut_texture,
+            layout: &bind_group_layouts.compute_storage_mut_texture,
             entries: &[BindGroupEntry {
                 binding: 0,
                 resource: wgpu::BindingResource::TextureView(&view),
@@ -96,11 +93,23 @@ impl EngineTexture for StandardTexture {
         &self.compute_bind_group
     }
 
-    fn compute_mut_group_f32(&self) -> Option<&BindGroup> {
+    fn compute_storage_group_f16(&self) -> Option<&BindGroup> {
+        None
+    }
+
+    fn compute_storage_group_rgf16(&self) -> Option<&BindGroup> {
+        None
+    }
+
+    fn compute_storage_mut_group_f32(&self) -> Option<&BindGroup> {
         Some(&self.compute_mut_bind_group)
     }
 
-    fn compute_mut_group_f16(&self) -> Option<&BindGroup> {
+    fn compute_storage_mut_group_f16(&self) -> Option<&BindGroup> {
+        None
+    }
+
+    fn compute_storage_mut_group_rgf16(&self) -> Option<&BindGroup> {
         None
     }
 
@@ -125,5 +134,10 @@ impl EngineTexture for StandardTexture {
 
     fn resolution_scale(&self) -> f32 {
         self.resolution_scale
+    }
+
+    fn resolution(&self) -> (u32, u32) {
+        let size = self.texture.size();
+        (size.width, size.height)
     }
 }

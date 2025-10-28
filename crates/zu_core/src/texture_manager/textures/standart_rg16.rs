@@ -2,7 +2,7 @@ use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, Device, Sampler, Text
 
 use crate::texture_manager::{BindGroupLayouts, textures::EngineTexture};
 
-pub struct StandardTextureF16 {
+pub struct StandardTextureRGF16 {
     pub texture: Texture,
     pub view: TextureView,
     pub bind_group: BindGroup,
@@ -12,7 +12,7 @@ pub struct StandardTextureF16 {
     pub resolution_scale: f32,
 }
 
-impl StandardTextureF16 {
+impl StandardTextureRGF16 {
     pub fn new(
         name: &str,
         resolution: (u32, u32),
@@ -31,7 +31,7 @@ impl StandardTextureF16 {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba16Float,
+            format: wgpu::TextureFormat::Rg16Float,
             usage: wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::COPY_DST
                 | wgpu::TextureUsages::RENDER_ATTACHMENT
@@ -64,7 +64,7 @@ impl StandardTextureF16 {
         });
         let compute_storage_bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some("Compute mut texture Bind Group"),
-            layout: &bind_group_layouts.compute_storage_f16_texture,
+            layout: &bind_group_layouts.compute_storage_rgf16_texture,
             entries: &[BindGroupEntry {
                 binding: 0,
                 resource: wgpu::BindingResource::TextureView(&view),
@@ -72,7 +72,7 @@ impl StandardTextureF16 {
         });
         let compute_mut_bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some("Compute mut texture Bind Group"),
-            layout: &bind_group_layouts.compute_storage_mut_f16_texture,
+            layout: &bind_group_layouts.compute_storage_mut_rgf16_texture,
             entries: &[BindGroupEntry {
                 binding: 0,
                 resource: wgpu::BindingResource::TextureView(&view),
@@ -90,7 +90,7 @@ impl StandardTextureF16 {
     }
 }
 
-impl EngineTexture for StandardTextureF16 {
+impl EngineTexture for StandardTextureRGF16 {
     fn view(&self) -> &TextureView {
         &self.view
     }
@@ -104,11 +104,11 @@ impl EngineTexture for StandardTextureF16 {
     }
 
     fn compute_storage_group_f16(&self) -> Option<&BindGroup> {
-        Some(&self.compute_storage_bind_group)
+        None
     }
 
     fn compute_storage_group_rgf16(&self) -> Option<&BindGroup> {
-        None
+        Some(&self.compute_storage_bind_group)
     }
 
     fn compute_storage_mut_group_f32(&self) -> Option<&BindGroup> {
@@ -116,11 +116,11 @@ impl EngineTexture for StandardTextureF16 {
     }
 
     fn compute_storage_mut_group_f16(&self) -> Option<&BindGroup> {
-        Some(&self.compute_mut_bind_group)
+        None
     }
 
     fn compute_storage_mut_group_rgf16(&self) -> Option<&BindGroup> {
-        None
+        Some(&self.compute_mut_bind_group)
     }
 
     fn resize(

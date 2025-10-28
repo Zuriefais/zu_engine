@@ -2,20 +2,21 @@ use crate::texture_manager::{
     BindGroupLayouts,
     textures::{
         scene_texture::SceneTexture, standard::StandardTexture, standard_f16::StandardTextureF16,
+        standart_rg16::StandardTextureRGF16,
     },
 };
 
-use wgpu::{
-    BindGroup, Device, Sampler, TextureView,
-};
+use wgpu::{BindGroup, Device, Sampler, TextureView};
 
 pub mod scene_texture;
 pub mod standard;
 pub mod standard_f16;
+pub mod standart_rg16;
 
 pub enum TextureType {
     Standard,
     StandardF16,
+    StandardRGF16,
     SceneTexture,
 }
 
@@ -23,8 +24,11 @@ pub trait EngineTexture {
     fn view(&self) -> &TextureView;
     fn bind_group(&self) -> &BindGroup;
     fn compute_bind_group(&self) -> &BindGroup;
-    fn compute_mut_group_f32(&self) -> Option<&BindGroup>;
-    fn compute_mut_group_f16(&self) -> Option<&BindGroup>;
+    fn compute_storage_group_f16(&self) -> Option<&BindGroup>;
+    fn compute_storage_group_rgf16(&self) -> Option<&BindGroup>;
+    fn compute_storage_mut_group_f32(&self) -> Option<&BindGroup>;
+    fn compute_storage_mut_group_f16(&self) -> Option<&BindGroup>;
+    fn compute_storage_mut_group_rgf16(&self) -> Option<&BindGroup>;
     fn resize(
         &mut self,
         resolution: (u32, u32),
@@ -35,11 +39,13 @@ pub trait EngineTexture {
         name: &str,
     );
     fn resolution_scale(&self) -> f32;
+    fn resolution(&self) -> (u32, u32);
 }
 
 pub enum ManagedTexture {
-    Standart(StandardTexture),
-    StandartF16(StandardTextureF16),
+    Standard(StandardTexture),
+    StandardF16(StandardTextureF16),
+    StandardRGF16(StandardTextureRGF16),
     SceneTexture(SceneTexture),
 }
 
@@ -55,12 +61,16 @@ impl EngineTexture for ManagedTexture {
         self.as_engine_texture().compute_bind_group()
     }
 
-    fn compute_mut_group_f32(&self) -> Option<&BindGroup> {
-        self.as_engine_texture().compute_mut_group_f32()
+    fn compute_storage_group_f16(&self) -> Option<&BindGroup> {
+        self.as_engine_texture().compute_storage_group_f16()
     }
 
-    fn compute_mut_group_f16(&self) -> Option<&BindGroup> {
-        self.as_engine_texture().compute_mut_group_f16()
+    fn compute_storage_mut_group_f32(&self) -> Option<&BindGroup> {
+        self.as_engine_texture().compute_storage_mut_group_f32()
+    }
+
+    fn compute_storage_mut_group_f16(&self) -> Option<&BindGroup> {
+        self.as_engine_texture().compute_storage_mut_group_f16()
     }
 
     fn resize(
@@ -85,6 +95,18 @@ impl EngineTexture for ManagedTexture {
     fn resolution_scale(&self) -> f32 {
         self.as_engine_texture().resolution_scale()
     }
+
+    fn resolution(&self) -> (u32, u32) {
+        self.as_engine_texture().resolution()
+    }
+
+    fn compute_storage_group_rgf16(&self) -> Option<&BindGroup> {
+        self.as_engine_texture().compute_storage_group_rgf16()
+    }
+
+    fn compute_storage_mut_group_rgf16(&self) -> Option<&BindGroup> {
+        self.as_engine_texture().compute_storage_mut_group_rgf16()
+    }
 }
 
 impl ManagedTexture {
@@ -98,7 +120,7 @@ impl ManagedTexture {
         texture_type: TextureType,
     ) -> Self {
         match texture_type {
-            TextureType::Standard => ManagedTexture::Standart(StandardTexture::new(
+            TextureType::Standard => ManagedTexture::Standard(StandardTexture::new(
                 name,
                 resolution,
                 device,
@@ -106,7 +128,7 @@ impl ManagedTexture {
                 sampler,
                 resolution_scale,
             )),
-            TextureType::StandardF16 => ManagedTexture::StandartF16(StandardTextureF16::new(
+            TextureType::StandardF16 => ManagedTexture::StandardF16(StandardTextureF16::new(
                 name,
                 resolution,
                 device,
@@ -122,27 +144,27 @@ impl ManagedTexture {
                 sampler,
                 resolution_scale,
             )),
+            TextureType::StandardRGF16 => ManagedTexture::StandardRGF16(StandardTextureRGF16::new(
+                name,
+                resolution,
+                device,
+                bind_group_layouts,
+                sampler,
+                resolution_scale,
+            )),
         }
     }
 
     pub fn as_engine_texture(&self) -> &dyn EngineTexture {
-        match self {
-            ManagedTexture::Standart(standard) => standard,
-            ManagedTexture::StandartF16(standard_f16) => standard_f16,
-            ManagedTexture::SceneTexture(scene_texture) => scene_texture,
-        }
+        self
     }
 
     pub fn as_engine_texture_mut(&mut self) -> &mut dyn EngineTexture {
-        match self {
-            ManagedTexture::Standart(standard) => standard,
-            ManagedTexture::StandartF16(standard_f16) => standard_f16,
-            ManagedTexture::SceneTexture(scene_texture) => scene_texture,
-        }
+        self
     }
 
     pub fn standard(&self) -> Option<&StandardTexture> {
-        if let ManagedTexture::Standart(standart) = self {
+        if let ManagedTexture::Standard(standart) = self {
             Some(standart)
         } else {
             None
@@ -150,7 +172,15 @@ impl ManagedTexture {
     }
 
     pub fn standard_f16(&self) -> Option<&StandardTextureF16> {
-        if let ManagedTexture::StandartF16(standart) = self {
+        if let ManagedTexture::StandardF16(standart) = self {
+            Some(standart)
+        } else {
+            None
+        }
+    }
+
+    pub fn standard_rgf16(&self) -> Option<&StandardTextureRGF16> {
+        if let ManagedTexture::StandardRGF16(standart) = self {
             Some(standart)
         } else {
             None

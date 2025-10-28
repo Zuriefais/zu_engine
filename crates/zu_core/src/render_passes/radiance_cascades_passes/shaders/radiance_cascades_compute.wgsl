@@ -2,7 +2,7 @@
 
 @group(1) @binding(0) var distance_texture: texture_2d<f32>;
 
-@group(2) @binding(0) var output_texture: texture_storage_2d<rgba32float, read_write>;
+@group(2) @binding(0) var output_texture: texture_storage_2d<rgba32float, write>;
 
 
 struct PushConstants {

@@ -1,8 +1,6 @@
 use glam::Vec2;
 use log::info;
-use wgpu::{
-    BindGroup, Device, Queue, Sampler, TextureView,
-};
+use wgpu::{BindGroup, Device, Queue, Sampler, TextureView};
 
 use crate::texture_manager::{
     BindGroupLayouts,
@@ -27,12 +25,12 @@ impl EngineTexture for SceneTexture {
         self.texture.compute_bind_group()
     }
 
-    fn compute_mut_group_f32(&self) -> Option<&BindGroup> {
-        self.texture.compute_mut_group_f32()
+    fn compute_storage_mut_group_f32(&self) -> Option<&BindGroup> {
+        self.texture.compute_storage_mut_group_f32()
     }
 
-    fn compute_mut_group_f16(&self) -> Option<&BindGroup> {
-        self.texture.compute_mut_group_f16()
+    fn compute_storage_mut_group_f16(&self) -> Option<&BindGroup> {
+        self.texture.compute_storage_mut_group_f16()
     }
 
     fn resize(
@@ -56,6 +54,22 @@ impl EngineTexture for SceneTexture {
 
     fn resolution_scale(&self) -> f32 {
         self.texture.resolution_scale()
+    }
+
+    fn compute_storage_group_f16(&self) -> Option<&BindGroup> {
+        None
+    }
+
+    fn resolution(&self) -> (u32, u32) {
+        self.texture.resolution()
+    }
+
+    fn compute_storage_group_rgf16(&self) -> Option<&BindGroup> {
+        None
+    }
+
+    fn compute_storage_mut_group_rgf16(&self) -> Option<&BindGroup> {
+        None
     }
 }
 

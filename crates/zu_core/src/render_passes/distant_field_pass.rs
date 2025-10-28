@@ -1,6 +1,4 @@
-use wgpu::{
-    CommandEncoder, Device,
-};
+use wgpu::{CommandEncoder, Device};
 
 use crate::{render_passes::quad_vertex::QuadVertexRenderPass, texture_manager::TextureManager};
 use crate::{texture_manager::textures::EngineTexture, vertex_state_for_quad};
@@ -80,6 +78,7 @@ impl DistantFieldPass {
         device: &Device,
         texture_manager: &TextureManager,
         quad_render_pass: &QuadVertexRenderPass,
+        jfa_texture: usize,
     ) {
         let distance_texture = texture_manager
             .get_texture("DistanceField")
@@ -104,7 +103,7 @@ impl DistantFieldPass {
         render_pass.set_bind_group(
             0,
             texture_manager
-                .get_texture("JfaTexture")
+                .get_texture_by_index(jfa_texture)
                 .expect("Couldn't get DistantField texture")
                 .bind_group(),
             &[],

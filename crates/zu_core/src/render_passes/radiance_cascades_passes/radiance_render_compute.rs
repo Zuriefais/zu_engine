@@ -1,8 +1,7 @@
 use bytemuck::{Pod, Zeroable, bytes_of};
 use egui_probe::EguiProbe;
 use wgpu::{
-    CommandEncoder, ComputePipelineDescriptor, Device,
-    PushConstantRange, ShaderStages,
+    CommandEncoder, ComputePipelineDescriptor, Device, PushConstantRange, ShaderStages,
     util::RenderEncoder,
 };
 
@@ -18,7 +17,7 @@ struct RadianceCascadesConstants {
     pub show_grain: i32,
     pub _padding0: i32,
     pub resolution: [f32; 2],
-    pub _padding1: [f32; 2], // чтобы размер был кратен 16 байт
+    pub _padding1: [f32; 2],
 }
 
 pub struct RadianceRenderComputePass {
@@ -36,7 +35,7 @@ impl RadianceRenderComputePass {
             bind_group_layouts: &[
                 texture_manager.get_compute_bind_group_layout(),
                 texture_manager.get_compute_bind_group_layout(),
-                texture_manager.get_compute_mut_bind_group_layout(),
+                texture_manager.get_compute_storage_mut_bind_group_layout(),
             ],
             push_constant_ranges: &[PushConstantRange {
                 stages: ShaderStages::COMPUTE,
@@ -59,10 +58,10 @@ impl RadianceRenderComputePass {
         &mut self,
         encoder: &mut CommandEncoder,
         texture_manager: &TextureManager,
-        options: RadiansOptions,
-        width: u32,
-        height: u32,
+        options: &RadiansOptions,
     ) {
+        let radiance_cascades_texture = texture_manager.get_texture("RadianceCascades").unwrap();
+        let (width, height) = radiance_cascades_texture.resolution();
         let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("Radiance compute pass"),
             timestamp_writes: Default::default(),
@@ -99,10 +98,7 @@ impl RadianceRenderComputePass {
         );
         compute_pass.set_bind_group(
             2,
-            texture_manager
-                .get_texture("RadianceCascades")
-                .unwrap()
-                .compute_mut_group_f32(),
+            radiance_cascades_texture.compute_storage_mut_group_f32(),
             &[],
         );
         let wg_x = (width + 7) / 16;
